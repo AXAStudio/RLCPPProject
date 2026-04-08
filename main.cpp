@@ -25,6 +25,11 @@ const float FOV_DEFAULT       = 85.0f;
 const float FOV_SPRINT        = 100.0f;
 const float FOV_SLIDE         = 105.0f;
 
+const float MAX_HEALTH        = 100.0f;
+const float MAX_STAMINA       = 100.0f;
+const float STAMINA_DRAIN     = 26.0f;
+const float STAMINA_REGEN     = 18.0f;
+
 // ─── Structures ──────────────────────────────────────────────────────────────
 struct Box {
     Vector3 center;
@@ -115,6 +120,10 @@ struct Player {
     float slideTimer = 0.0f;
     float landTimer = 0.0f;
     float cameraTilt = 0.0f;
+    float wallRunGraceTimer = 0.0f;
+
+    float health = MAX_HEALTH;
+    float stamina = MAX_STAMINA;
 
     Camera3D camera = {0};
 
@@ -124,7 +133,9 @@ struct Player {
         pitch  = Clamp(pitch - mouse.y * MOUSE_SENSITIVITY, -89.0f, 89.0f);
 
         bool wantsSlide  = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_LEFT_SUPER) || IsKeyDown(KEY_C);
-        bool sprinting   = IsKeyDown(KEY_LEFT_SHIFT) && onGround && !wantsSlide;
+        bool sprintButton = IsKeyDown(KEY_LEFT_SHIFT);
+        bool canSprint = stamina > 5.0f;
+        bool sprinting   = sprintButton && onGround && !wantsSlide && canSprint;
         bool jumpPressed = IsKeyPressed(KEY_SPACE);
 
         Vector3 fwd   = { sinf(DEG2RAD * yaw), 0, cosf(DEG2RAD * yaw) };
@@ -160,6 +171,10 @@ struct Player {
                 if (slideTimer <= 0 || Vector3Length(velocity) < 2.0f) isSliding = false;
             }
 
+            if (sprinting && Vector3Length(moveInput) > 0.1f) {
+                stamina -= STAMINA_DRAIN * dt;
+            }
+
             if (jumpPressed) {
                 velocity.y = isSliding ? JUMP_FORCE * 0.8f : JUMP_FORCE;
                 onGround   = false;
@@ -170,6 +185,7 @@ struct Player {
 
             if (isWallRunning) {
                 velocity.y = Lerp(velocity.y, -2.0f, dt * 5.0f);
+                stamina -= STAMINA_DRAIN * 0.55f * dt;
 
                 if (jumpPressed) {
                     velocity    = Vector3Add(velocity, Vector3Scale(wallNormal, 9.0f));
@@ -189,12 +205,18 @@ struct Player {
             }
         }
 
+        if (!sprinting && !isWallRunning) {
+            stamina += STAMINA_REGEN * dt;
+        }
+        stamina = Clamp(stamina, 0.0f, MAX_STAMINA);
+
         if (!isWallRunning) velocity.y += GRAVITY * dt;
         position = Vector3Add(position, Vector3Scale(velocity, dt));
 
         bool wasGrounded  = onGround;
         onGround          = false;
         bool touchedWall  = false;
+        bool wallRunEligible = false;
 
         if (position.y <= GROUND_Y + PLAYER_HEIGHT/2.0f) {
             position.y = GROUND_Y + PLAYER_HEIGHT/2.0f;
@@ -211,17 +233,21 @@ struct Player {
 
                     // Calculate forward & wall tangent
                     Vector3 moveDir = Vector3Length(moveInput) > 0.1f ? Vector3Normalize(moveInput) : Vector3Zero();
+                    Vector3 horizVel = { velocity.x, 0, velocity.z };
+                    Vector3 velDir = Vector3Length(horizVel) > 0.1f ? Vector3Normalize(horizVel) : Vector3Zero();
                     float dotFwd = Vector3DotProduct(moveDir, Vector3Scale(hitNormal, -1));
                     Vector3 wallTangent = Vector3Normalize(Vector3CrossProduct(hitNormal, {0, 1, 0}));
-                    float moveAlongWall = Vector3DotProduct(moveDir, wallTangent);
+                    float moveAlongWall = Vector3DotProduct(velDir, wallTangent);
 
-                    // Wall-running trigger: either moving mostly forward or along the wall
-                    if (!onGround && (dotFwd > 0.25f || fabs(moveAlongWall) > 0.4f)) {
+                    // Wall-running trigger: require both some forward wall contact and wall-parallel momentum.
+                    float forwardIntoWall = dotFwd;
+                    float wallParallel    = fabs(moveAlongWall);
+                    if (!onGround && forwardIntoWall > 0.22f && wallParallel > 0.35f) {
+                        wallRunEligible = true;
                         isWallRunning = true;
                         wallNormal = hitNormal;
 
                         // Project horizontal velocity along wall tangent to stick
-                        Vector3 horizVel = { velocity.x, 0, velocity.z };
                         float speedAlongTangent = Vector3DotProduct(horizVel, wallTangent);
                         velocity.x = wallTangent.x * speedAlongTangent;
                         velocity.z = wallTangent.z * speedAlongTangent;
@@ -243,7 +269,13 @@ struct Player {
             }
         }
 
-        if (!touchedWall || Vector3Length(moveInput) < 0.1f)
+        if (wallRunEligible) {
+            wallRunGraceTimer = 0.25f;
+        } else {
+            wallRunGraceTimer = fmaxf(wallRunGraceTimer - dt, 0.0f);
+        }
+
+        if (!touchedWall && wallRunGraceTimer <= 0.0f)
             isWallRunning = false;
 
         // Wall jump input
@@ -340,6 +372,20 @@ void DrawCubeWithTexture(Texture2D tex, Vector3 center, float w, float h, float 
     rlSetTexture(0);
 }
 
+void DrawStatusBar(float x, float y, float width, float height, float value, float maxValue, Color fill, const char* label) {
+    float ratio = Clamp(value / maxValue, 0.0f, 1.0f);
+    Rectangle outer = { x, y, width, height };
+    Rectangle fillRect = { x + 1, y + 1, (width - 2) * ratio, height - 2 };
+
+    DrawRectangleRounded(outer, 0.25f, 6, (Color){18, 18, 18, 220});
+    if (fillRect.width > 0) DrawRectangleRounded(fillRect, 0.25f, 6, fill);
+    DrawRectangleRoundedLines(outer, 0.25f, 6, Fade(WHITE, 0.18f));
+
+    int fontSize = (height > 24) ? 18 : 16;
+    int textWidth = MeasureText(label, fontSize);
+    DrawText(label, x + (width - textWidth) * 0.5f, y + (height - fontSize) * 0.5f, fontSize, WHITE);
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 int main() {
     SetConfigFlags(FLAG_MSAA_4X_HINT);
@@ -372,6 +418,7 @@ int main() {
         float dt = GetFrameTime();
 
         player.Update(dt, obstacles);
+
         hit.Update(dt);
 
         float hSpeed = sqrtf(player.velocity.x*player.velocity.x + player.velocity.z*player.velocity.z);
@@ -424,6 +471,8 @@ int main() {
 
             DrawFPS(10, 10);
             DrawText("CTRL: Slide | SPACE: Jump/Walljump/Mantle", 10, 40, 20, LIGHTGRAY);
+            DrawStatusBar(20, SCREEN_HEIGHT - 70, 360, 32, player.health, MAX_HEALTH, RED, TextFormat("HEALTH %d / %d", (int)player.health, (int)MAX_HEALTH));
+            // DrawStatusBar(20, SCREEN_HEIGHT - 104, 360, 22, player.stamina, MAX_STAMINA, SKYBLUE, TextFormat("STAMINA %d / %d", (int)player.stamina, (int)MAX_STAMINA));
             DrawText(TextFormat("SPEED: %02.0f", hSpeed), 10, SCREEN_HEIGHT - 30, 20, ORANGE);
             if (player.isWallRunning) DrawText("WALLRUNNING", cx - 60, cy + 40, 20, GREEN);
             if (player.isSliding)     DrawText("SLIDING",     cx - 40, cy + 40, 20, SKYBLUE);
