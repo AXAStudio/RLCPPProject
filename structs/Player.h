@@ -54,13 +54,69 @@ const float DASH_AIR_LIFT          = 2.2f;
 const float DASH_FOV_BOOST         = 18.0f;
 const float DASH_TILT              = 6.0f;
 
+const float RL_MAX_EPISODE_TIME    = 14.0f;
+const float RL_STUCK_TIME          = 2.75f;
+const float RL_GOAL_RADIUS         = 3.25f;
+const float RL_SENSOR_RANGE        = 16.0f;
+const float RL_AREA_RADIUS         = 4.75f;
+const float RL_AREA_GRACE_TIME     = 0.85f;
+
 struct RLControl {
     Vector3 moveInput = { 0, 0, 0 };
     bool dash = false;
     bool jump = false;
+    bool slide = false;
     float yawDelta = 0.0f;
     float pitchDelta = 0.0f;
 };
+
+inline float RLHorizontalDistance(const Vector3& a, const Vector3& b) {
+    float dx = a.x - b.x;
+    float dz = a.z - b.z;
+    return sqrtf(dx * dx + dz * dz);
+}
+
+inline Vector3 RLFlatDirection(const Vector3& from, const Vector3& to) {
+    Vector3 rel = { to.x - from.x, 0.0f, to.z - from.z };
+    float len = sqrtf(rel.x * rel.x + rel.z * rel.z);
+    return (len > 0.001f) ? Vector3Scale(rel, 1.0f / len) : (Vector3){ 0, 0, -1 };
+}
+
+inline Vector3 RLRotateFlat(const Vector3& dir, float degrees) {
+    float r = degrees * DEG2RAD;
+    float cs = cosf(r);
+    float sn = sinf(r);
+    return Vector3Normalize((Vector3){
+        dir.x * cs - dir.z * sn,
+        0.0f,
+        dir.x * sn + dir.z * cs
+    });
+}
+
+inline float RLSensorClearance(const Vector3& origin, const Vector3& direction, const std::vector<Box>& obstacles, float maxDistance) {
+    Ray ray = { origin, Vector3Normalize(direction) };
+    float nearest = maxDistance;
+
+    for (const auto& box : obstacles) {
+        BoundingBox bb = {
+            Vector3Subtract(box.center, box.half),
+            Vector3Add(box.center, box.half)
+        };
+
+        RayCollision hit = GetRayCollisionBox(ray, bb);
+        if (hit.hit && hit.distance > 0.0f && hit.distance < nearest) {
+            nearest = hit.distance;
+        }
+    }
+
+    return Clamp(nearest / maxDistance, 0.0f, 1.0f);
+}
+
+inline bool SphereNearBox(const Vector3& pos, float radius, const Box& box) {
+    return fabsf(pos.x - box.center.x) <= box.half.x + radius &&
+           fabsf(pos.y - box.center.y) <= box.half.y + radius &&
+           fabsf(pos.z - box.center.z) <= box.half.z + radius;
+}
 
 bool ResolveCollision(Vector3& pos, Vector3& vel, float radius, const Box& box, bool& grounded, Vector3& outNormal) {
     Vector3 min = Vector3Subtract(box.center, box.half);
@@ -129,15 +185,25 @@ struct Player {
     // reinforcement learning bookkeeping
     float rlReward = 0.0f;
     float rlEpisodeReward = 0.0f;
+    float rlStartTargetDistance = 1.0f;
     float rlPreviousTargetDistance = 0.0f;
+    float rlBestTargetDistance = 0.0f;
+    float rlEpisodeTime = 0.0f;
+    float rlNoProgressTimer = 0.0f;
+    float rlAreaTimer = 0.0f;
+    float rlLastProgress = 0.0f;
     int rlSteps = 0;
     bool rlDone = false;
+    bool rlSucceeded = false;
+    bool rlTimedOut = false;
+    bool rlStuck = false;
     Vector3 rlTarget = { 0, 0, 0 };
+    Vector3 rlAreaAnchor = { 0, 0, 0 };
 
     float health = MAX_HEALTH;
     float stamina = MAX_STAMINA;
 
-    Camera3D camera = { 0 };
+    Camera3D camera = {};
 
     void Update(float dt, const std::vector<Box>& obstacles, bool meleeLocked, bool katanaActive, float katanaNorm, bool useRL = false, const RLControl& rlControl = RLControl()) {
         if (useRL) {
@@ -149,7 +215,7 @@ struct Player {
             pitch = Clamp(pitch - mouse.y * MOUSE_SENSITIVITY, -89.0f, 89.0f);
         }
 
-        bool wantsSlide   = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_LEFT_SUPER) || IsKeyDown(KEY_C);
+        bool wantsSlide   = useRL ? rlControl.slide : (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_LEFT_SUPER) || IsKeyDown(KEY_C));
         bool sprintButton = useRL ? (Vector3Length(rlControl.moveInput) > 0.1f) : IsKeyDown(KEY_LEFT_SHIFT);
         bool canSprint    = stamina > 5.0f;
         bool sprinting    = sprintButton && onGround && !wantsSlide && canSprint;
@@ -333,6 +399,8 @@ struct Player {
         }
 
         for (const auto& box : obstacles) {
+            if (!SphereNearBox(position, PLAYER_RADIUS, box)) continue;
+
             Vector3 hitNormal;
             if (ResolveCollision(position, velocity, PLAYER_RADIUS, box, onGround, hitNormal)) {
                 if (fabsf(hitNormal.y) < 0.1f) {
@@ -448,6 +516,10 @@ struct Player {
         }
     }
 
+    float GetHorizontalSpeed() const {
+        return sqrtf(velocity.x * velocity.x + velocity.z * velocity.z);
+    }
+
     void ResetRL(const Vector3& start, const Vector3& target) {
         position = start;
         velocity = { 0, 0, 0 };
@@ -474,49 +546,148 @@ struct Player {
         dashVisualTimer = 0.0f;
         health = MAX_HEALTH;
         stamina = MAX_STAMINA;
-        camera = { 0 };
+        camera = {};
 
         rlReward = 0.0f;
         rlEpisodeReward = 0.0f;
-        rlPreviousTargetDistance = Vector3Distance(start, target);
+        rlStartTargetDistance = fmaxf(1.0f, RLHorizontalDistance(start, target));
+        rlPreviousTargetDistance = rlStartTargetDistance;
+        rlBestTargetDistance = rlPreviousTargetDistance;
+        rlEpisodeTime = 0.0f;
+        rlNoProgressTimer = 0.0f;
+        rlAreaTimer = 0.0f;
+        rlLastProgress = 0.0f;
         rlSteps = 0;
         rlDone = false;
+        rlSucceeded = false;
+        rlTimedOut = false;
+        rlStuck = false;
         rlTarget = target;
+        rlAreaAnchor = start;
     }
 
     std::vector<float> GetRLState() const {
-        Vector3 rel = Vector3Subtract(rlTarget, position);
-        float dist = Vector3Length(rel);
-        Vector3 dir = (dist > 0.001f) ? Vector3Scale(rel, 1.0f / dist) : (Vector3){ 0, 0, 0 };
+        static const std::vector<Box> noObstacles;
+        return GetRLState(noObstacles);
+    }
+
+    std::vector<float> GetRLState(const std::vector<Box>& obstacles) const {
+        float dist = RLHorizontalDistance(position, rlTarget);
+        float completion = 1.0f - Clamp(dist / fmaxf(1.0f, rlStartTargetDistance), 0.0f, 1.0f);
+        float timeUsed = rlEpisodeTime / RL_MAX_EPISODE_TIME;
+        float timeLeft = 1.0f - Clamp(timeUsed, 0.0f, 1.0f);
+        float areaPressure = Clamp(rlAreaTimer / RL_STUCK_TIME, 0.0f, 2.0f);
+        float noProgressPressure = Clamp(rlNoProgressTimer / RL_STUCK_TIME, 0.0f, 2.0f);
+        float progressSignal = Clamp(rlLastProgress * 5.0f, -1.0f, 1.0f);
+        Vector3 dir = RLFlatDirection(position, rlTarget);
+        Vector3 sensorOrigin = { position.x, position.y + 0.2f, position.z };
+        Vector3 left = RLRotateFlat(dir, -45.0f);
+        Vector3 right = RLRotateFlat(dir, 45.0f);
+        Vector3 hardLeft = RLRotateFlat(dir, -90.0f);
+        Vector3 hardRight = RLRotateFlat(dir, 90.0f);
+        float forwardClear = RLSensorClearance(sensorOrigin, dir, obstacles, RL_SENSOR_RANGE);
+        float leftClear = RLSensorClearance(sensorOrigin, left, obstacles, RL_SENSOR_RANGE);
+        float rightClear = RLSensorClearance(sensorOrigin, right, obstacles, RL_SENSOR_RANGE);
+        float hardLeftClear = RLSensorClearance(sensorOrigin, hardLeft, obstacles, RL_SENSOR_RANGE);
+        float hardRightClear = RLSensorClearance(sensorOrigin, hardRight, obstacles, RL_SENSOR_RANGE);
+        float bestSideClear = fmaxf(leftClear, rightClear);
+        float minClear = fminf(forwardClear, bestSideClear);
+        float sideClearDiff = rightClear - leftClear;
 
         return {
             dir.x,
-            dir.y,
             dir.z,
             dist / 100.0f,
+            completion,
             velocity.x / 20.0f,
             velocity.z / 20.0f,
+            GetHorizontalSpeed() / 30.0f,
             dashCooldown / DASH_COOLDOWN_TIME,
+            stamina / MAX_STAMINA,
             onGround ? 1.0f : 0.0f,
             isWallRunning ? 1.0f : 0.0f,
-            isDashing ? 1.0f : 0.0f
+            isDashing ? 1.0f : 0.0f,
+            timeUsed,
+            timeLeft,
+            areaPressure,
+            noProgressPressure,
+            progressSignal,
+            forwardClear,
+            leftClear,
+            rightClear,
+            hardLeftClear,
+            hardRightClear,
+            minClear,
+            bestSideClear,
+            sideClearDiff,
+            completion * timeLeft,
+            completion * GetHorizontalSpeed() / 30.0f,
+            completion * forwardClear,
+            completion * bestSideClear,
+            timeLeft * progressSignal,
+            areaPressure * noProgressPressure,
+            (1.0f - forwardClear) * (1.0f - completion)
         };
     }
 
     void UpdateRLReward(float dt) {
         if (rlDone) return;
 
-        float currentDistance = Vector3Distance(position, rlTarget);
-        float progressReward = (rlPreviousTargetDistance - currentDistance) * 0.08f;
-        float dashBonus = isDashing ? 0.18f * dt : 0.0f;
-        float wallrunBonus = isWallRunning ? 0.25f * dt : 0.0f;
-        float timePenalty = -0.015f * dt;
+        rlEpisodeTime += dt;
 
-        float reward = progressReward + dashBonus + wallrunBonus + timePenalty;
+        float currentDistance = RLHorizontalDistance(position, rlTarget);
+        float progress = rlPreviousTargetDistance - currentDistance;
+        float completion = 1.0f - Clamp(currentDistance / fmaxf(1.0f, rlStartTargetDistance), 0.0f, 1.0f);
+        float timeUsed = Clamp(rlEpisodeTime / RL_MAX_EPISODE_TIME, 0.0f, 1.0f);
+        Vector3 targetDir = RLFlatDirection(position, rlTarget);
+        float goalVelocity = velocity.x * targetDir.x + velocity.z * targetDir.z;
+        float newBestProgress = 0.0f;
+        rlLastProgress = progress;
 
-        if (currentDistance < 2.0f) {
-            reward += 2.5f;
+        if (RLHorizontalDistance(position, rlAreaAnchor) > RL_AREA_RADIUS) {
+            rlAreaAnchor = position;
+            rlAreaTimer = 0.0f;
+        } else {
+            rlAreaTimer += dt;
+        }
+
+        if (currentDistance < rlBestTargetDistance - 0.045f) {
+            newBestProgress = rlBestTargetDistance - currentDistance;
+            rlNoProgressTimer = 0.0f;
+            rlBestTargetDistance = currentDistance;
+        } else {
+            rlNoProgressTimer += dt;
+        }
+
+        float reward = progress * 0.55f + newBestProgress * 1.15f;
+        reward -= (0.10f + timeUsed * (1.0f - completion) * 0.18f) * dt;
+        reward += Clamp(goalVelocity / 24.0f, -1.0f, 1.0f) * 0.035f;
+        if (progress > 0.0f) reward += completion * 0.040f;
+        if (progress < -0.01f) reward += progress * 0.55f;
+        if (rlNoProgressTimer > 0.65f) {
+            float noProgress = rlNoProgressTimer - 0.65f;
+            reward -= noProgress * noProgress * 0.095f * dt;
+        }
+        if (GetHorizontalSpeed() < 0.35f) reward -= 0.04f * dt;
+        if (isDashing && progress <= 0.0f) reward -= 0.025f;
+
+        if (rlAreaTimer > RL_AREA_GRACE_TIME) {
+            float lingering = rlAreaTimer - RL_AREA_GRACE_TIME;
+            reward -= (lingering * lingering * 0.095f + lingering * 0.060f) * dt;
+        }
+
+        if (currentDistance < RL_GOAL_RADIUS) {
+            reward += 95.0f + fmaxf(0.0f, RL_MAX_EPISODE_TIME - rlEpisodeTime) * 4.0f + completion * 30.0f;
             rlDone = true;
+            rlSucceeded = true;
+        } else if (rlEpisodeTime >= RL_MAX_EPISODE_TIME) {
+            reward -= 75.0f + currentDistance * 1.10f + (1.0f - completion) * 58.0f + rlAreaTimer * 3.0f + rlNoProgressTimer * 6.5f;
+            rlDone = true;
+            rlTimedOut = true;
+        } else if (rlNoProgressTimer >= RL_STUCK_TIME) {
+            reward -= 65.0f + currentDistance * 0.90f + rlAreaTimer * 3.3f + rlNoProgressTimer * 8.5f;
+            rlDone = true;
+            rlStuck = true;
         }
 
         rlPreviousTargetDistance = currentDistance;
