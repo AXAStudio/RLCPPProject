@@ -1,0 +1,1854 @@
+RL MOVEMENT TRAINING REPORT
+Generated: 2026-05-05 18:34:40
+File: rl_training_report.txt
+
+HOW TO READ THIS FILE
+  - Success rate and average successful time matter more than one lucky best run.
+  - Positive reward with bad outcomes means the reward function can still be exploited.
+  - Target speed is the requested multiplier. Actual speed is what the executable really achieved.
+  - Wall hits, collision cost, timeout rate, and stuck rate explain why a high reward episode can still look bad.
+
+RUN CONFIGURATION
+  selected model: Steady
+  best model by trainer ranking: Steady
+  target training speed: 250000x (250000x)
+  achieved training speed: 641.7x
+  achieved/target ratio: 0.00
+  runner updates/sec estimate: 192509
+  active model count: 5
+  turbo mode: on
+  solo mode: all models
+  fixed training steps last frame: 1971
+  simulated seconds last frame: 32.8497
+  pending sim queue: 1767.04s
+
+WORLD AND OBSERVATION CONFIGURATION
+  start point: (0.00, 5.00, 52.00)
+  goal point: (0.00, 4.85, -52.00)
+  start-to-goal horizontal distance: 104.00m
+  obstacle count: 73
+  observation size: 33
+  discrete action count: 31
+  manual personal best replay: saved
+  manual best finish time: 5.53s
+  manual best frames/trail/experiences: 159 frames, 130 trail points, 790 elite samples
+  obstacle table:
+    idx   center                  half-size
+    ------------------------------------------------------
+      0   (0.00, 5.00, -58.00)   (50.00, 5.00, 1.00)
+      1   (0.00, 5.00, 58.00)    (50.00, 5.00, 1.00)
+      2   (-50.00, 5.00, 0.00)   (1.00, 5.00, 58.00)
+      3   (50.00, 5.00, 0.00)    (1.00, 5.00, 58.00)
+      4   (0.00, 2.20, 0.00)     (6.00, 2.20, 16.00)
+      5   (-10.00, 1.20, 0.00)   (2.50, 1.20, 4.00)
+      6   (10.00, 1.20, 0.00)    (2.50, 1.20, 4.00)
+      7   (0.00, 1.00, -20.00)   (8.00, 1.00, 2.50)
+      8   (0.00, 1.00, 20.00)    (8.00, 1.00, 2.50)
+      9   (-19.00, 3.20, 0.00)   (2.00, 3.20, 18.00)
+     10   (19.00, 3.20, 0.00)    (2.00, 3.20, 18.00)
+     11   (-31.00, 3.20, -10.00) (2.00, 3.20, 10.00)
+     12   (-31.00, 3.20, 10.00)  (2.00, 3.20, 10.00)
+     13   (31.00, 3.20, -10.00)  (2.00, 3.20, 10.00)
+     14   (31.00, 3.20, 10.00)   (2.00, 3.20, 10.00)
+     15   (-39.00, 2.80, -34.00) (7.00, 2.80, 1.50)
+     16   (-42.00, 1.20, -20.00) (2.50, 1.20, 4.00)
+     17   (-42.00, 1.20, 0.00)   (2.50, 1.20, 4.00)
+     18   (-42.00, 1.20, 20.00)  (2.50, 1.20, 4.00)
+     19   (-38.00, 2.80, 34.00)  (8.00, 2.80, 1.50)
+     20   (-34.00, 3.00, -42.00) (2.50, 3.00, 6.00)
+     21   (-34.00, 3.00, 42.00)  (2.50, 3.00, 6.00)
+     22   (-27.00, 1.20, -28.00) (2.50, 1.20, 2.50)
+     23   (-27.00, 1.20, 28.00)  (2.50, 1.20, 2.50)
+     24   (-43.00, 1.40, 40.00)  (3.00, 1.40, 3.00)
+     25   (-36.00, 1.40, 46.00)  (3.00, 1.40, 3.00)
+     26   (-43.00, 1.40, -40.00) (3.00, 1.40, 3.00)
+     27   (-36.00, 1.40, -46.00) (3.00, 1.40, 3.00)
+     28   (39.00, 2.80, -34.00)  (7.00, 2.80, 1.50)
+     29   (42.00, 1.20, -20.00)  (2.50, 1.20, 4.00)
+     30   (42.00, 1.20, 0.00)    (2.50, 1.20, 4.00)
+     31   (42.00, 1.20, 20.00)   (2.50, 1.20, 4.00)
+     32   (38.00, 2.80, 34.00)   (8.00, 2.80, 1.50)
+     33   (34.00, 3.00, -42.00)  (2.50, 3.00, 6.00)
+     34   (34.00, 3.00, 42.00)   (2.50, 3.00, 6.00)
+     35   (27.00, 1.20, -28.00)  (2.50, 1.20, 2.50)
+     36   (27.00, 1.20, 28.00)   (2.50, 1.20, 2.50)
+     37   (43.00, 1.40, 40.00)   (3.00, 1.40, 3.00)
+     38   (36.00, 1.40, 46.00)   (3.00, 1.40, 3.00)
+     39   (43.00, 1.40, -40.00)  (3.00, 1.40, 3.00)
+     40   (36.00, 1.40, -46.00)  (3.00, 1.40, 3.00)
+     41   (-16.00, 3.00, -46.00) (11.00, 3.00, 1.30)
+     42   (16.00, 3.00, -46.00)  (11.00, 3.00, 1.30)
+     43   (0.00, 2.20, -52.00)   (4.00, 2.20, 3.00)
+     44   (-10.00, 1.00, -38.00) (2.50, 1.00, 2.50)
+     45   (10.00, 1.00, -38.00)  (2.50, 1.00, 2.50)
+     46   (-30.00, 4.50, -50.00) (3.00, 4.50, 3.00)
+     47   (30.00, 4.50, -50.00)  (3.00, 4.50, 3.00)
+     48   (-16.00, 3.00, 46.00)  (11.00, 3.00, 1.30)
+     49   (16.00, 3.00, 46.00)   (11.00, 3.00, 1.30)
+     50   (0.00, 2.20, 52.00)    (4.00, 2.20, 3.00)
+     51   (-10.00, 1.00, 38.00)  (2.50, 1.00, 2.50)
+     52   (10.00, 1.00, 38.00)   (2.50, 1.00, 2.50)
+     53   (-30.00, 4.50, 50.00)  (3.00, 4.50, 3.00)
+     54   (30.00, 4.50, 50.00)   (3.00, 4.50, 3.00)
+     55   (-13.00, 2.00, -14.00) (2.00, 2.00, 5.00)
+     56   (-13.00, 2.00, 14.00)  (2.00, 2.00, 5.00)
+     57   (13.00, 2.00, -14.00)  (2.00, 2.00, 5.00)
+     58   (13.00, 2.00, 14.00)   (2.00, 2.00, 5.00)
+     59   (-24.00, 2.40, -24.00) (1.80, 2.40, 6.00)
+     60   (-24.00, 2.40, 24.00)  (1.80, 2.40, 6.00)
+     61   (24.00, 2.40, -24.00)  (1.80, 2.40, 6.00)
+     62   (24.00, 2.40, 24.00)   (1.80, 2.40, 6.00)
+     63   (-5.00, 0.90, -30.00)  (2.00, 0.90, 2.00)
+     64   (5.00, 0.90, -30.00)   (2.00, 0.90, 2.00)
+     65   (-5.00, 0.90, 30.00)   (2.00, 0.90, 2.00)
+     66   (5.00, 0.90, 30.00)    (2.00, 0.90, 2.00)
+     67   (-18.00, 1.00, 0.00)   (2.00, 1.00, 3.00)
+     68   (18.00, 1.00, 0.00)    (2.00, 1.00, 3.00)
+     69   (-47.00, 1.20, -10.00) (2.00, 1.20, 3.00)
+     70   (-47.00, 1.20, 10.00)  (2.00, 1.20, 3.00)
+     71   (47.00, 1.20, -10.00)  (2.00, 1.20, 3.00)
+     72   (47.00, 1.20, 10.00)   (2.00, 1.20, 3.00)
+
+GLOBAL PERFORMANCE DIAGNOSIS
+  - The executable is CPU-budget limited at the selected multiplier. Clicking 250000x cannot force 250000x if the frame budget can only simulate about 642x.
+  - All-model training multiplies CPU work by 5. Use solo mode (M) when tuning one model or measuring true speed.
+  - Action space is broad. Remove actions that stay below 1-2% usage after training, unless they appear in the best successful replay.
+  - Biggest CPU costs are fixed-step runner updates, obstacle collision/sensor checks, replay learning bursts after episode end, and rendering if lightweight mode is off.
+  - Useful next optimizations: profile runner updates/sec, cache obstacle clearance checks per frame, lower replay bursts for weak models, and benchmark with rendering skipped.
+
+MODEL SUMMARY TABLE
+  model          ep    done   succ   succ%   timeout   stuck   best time   best reward   eps    recent succ%   rank
+  ----------------------------------------------------------------------------------------------------------------------
+  Balanced      93363   93362  45905    49.2     16513   30944         6.1         609.6    0.0        56.2 37103.8
+  Explorer      95352   95351  49346    51.8     16680   29325         6.1         604.0    0.0        58.8 39872.9
+  Sprinter      94998   94997  43326    45.6     14069   37602         6.1         634.2    0.0        51.2 35006.5
+  Side Route    86924   86923  21637    24.9     27916   37370         6.5         601.8    0.0        27.5 17327.8
+  Steady       102685  102684  68018    66.2      6730   27936         6.0         622.0    0.0        65.0 54906.0
+
+================================================================================
+MODEL 0: Balanced
+================================================================================
+identity:
+  selected: no
+  trainer-ranked best: no
+  reliable selection score: 37103.79
+  color rgba: (102, 191, 255, 255)
+
+lifetime outcomes:
+  episodes started: 93363
+  finished episodes: 93362
+  successes: 45905 (49.2%)
+  timeouts: 16513 (17.7%)
+  stucks: 30944 (33.1%)
+  episodes since best improvement: 225
+  best reward seen: 609.566
+  best success reward: 608.126
+  best success time: 6.117s
+  best replay duration: 6.117s
+  best replay frames/trail: 148 frames, 117 trail points
+
+current live episode:
+  current action: ARC L
+  episode time: 9.633s / 14.000s
+  episode reward: -88.915
+  last step reward: -0.089
+  distance to goal: 6.434m
+  wall hits: 29
+  collision cost: 57.612
+  position: (-6.28, 3.41, -53.40)
+  velocity: (1.65, -0.10, -12.07)
+
+learning parameters:
+  learning rate: 0.055
+  discount: 0.960
+  epsilon/current floor decay: 0.006 / 0.006 / 0.999
+  decision interval: 0.120s
+  turn rate: 360.000 deg/s
+  clearance guidance: 0.240
+  raw feature count: 33
+  encoded feature count: 67
+  replay memory: 24000 / 24000
+  elite memory: 4000 / 4000
+  manual guidance: 5 replays, 3990 samples
+  best-run anchor: 51 samples, 441456 rehearsed updates
+  best-path reward: current episode -1.065, lifetime 120358.797, last step -0.037
+  best policy saved: yes
+  last TD error: 0.666
+
+recent 80 episode aggregate:
+  successes: 45 (56.2%)
+  timeouts: 12 (15.0%)
+  stucks: 23 (28.8%)
+  average reward: -255.110
+  average episode time: 11.331s
+  average successful time: 10.406s
+  best recent success time: 6.367s
+  average distance remaining: 6.067m
+  average wall hits: 34.925
+  average collision cost: 62.456
+  average decisions: 94.725
+
+  readout and recommendations:
+    - Best run is much faster than average recent successes. Treat the best replay as a rare peak, not the model's normal performance.
+    - Stuck rate is high. Penalize low speed/no-progress harder after wall contact and consider reducing dash-heavy action bias for this model.
+    - Wall contact is expensive for learning quality. RL treats wallruns as a fallback except for productive final-cube climbs; keep rewarding clear forward progress and down-rank dash actions when clearance is low.
+    - Replay memory is near capacity. If training lags, lower memory capacity or replay batch counts before adding more actions/features.
+    - Program is CPU-budget limited at this speed setting. The label is not real sim speed; use actual speed, solo mode, and fewer active runners when benchmarking.
+
+learned action parameter snapshot:
+  idx  action           bias     weights   avg |w|   max |w|   last flag
+  -----------------------------------------------------------------------
+    0  GOAL            0.000        68   24.1862  183.2378   move
+    1  TIGHT L         0.000        68   26.3329  228.9889   move
+    2  TIGHT R         0.000        68   35.0920  235.5961   move
+    3  ARC L          -0.020        68   25.4660  213.4278   move
+    4  ARC R          -0.020        68   46.1156  251.4288   move
+    5  WIDE L         -0.020        68   30.2377  224.8968   move
+    6  WIDE R         -0.020        68   30.3123  213.8833   move
+    7  CUT L          -0.020        68   20.6275  176.5717   move
+    8  CUT R           0.000        68   27.9513  264.7362   move
+    9  DASH            0.000        68   25.8979  127.3643   dash 
+   10  DASH UP         0.000        68   27.5226  171.4012   dash 
+   11  DASH DOWN       0.000        68   16.1514   76.9105   dash 
+   12  DASH UP L      -0.020        68   31.8084  176.8568   dash 
+   13  DASH UP R      -0.025        68   16.8610  110.2766   dash 
+   14  DASH LOW L      0.000        68   16.2431   98.2426   dash 
+   15  DASH LOW R      0.000        68   16.8798   81.9186   dash 
+   16  DASH T L        0.000        68   14.8160   78.9651   dash 
+   17  DASH T R       -0.060        68   15.1032   72.0393   dash 
+   18  DASH L          0.000        68   15.5760   88.8421   dash 
+   19  DASH R         -0.025        68   14.4617   81.2152   dash 
+   20  DASH W L       -0.100        68   15.1767   74.1426   dash 
+   21  DASH W R       -0.020        68   23.8377  152.7067   dash 
+   22  JUMP            0.000        68   22.5684  122.4875   jump 
+   23  JUMP L          0.000        68   18.4510  112.5406   jump 
+   24  JUMP R          0.000        68   28.2551  200.8733   jump 
+   25  JUMP W L        0.000        68   22.5914  110.4601   jump 
+   26  JUMP W R        0.000        68   33.9024  225.7426   jump 
+   27  JUMP DASH       0.000        68   15.6749   74.2474   dash jump 
+   28  JUMP DASH L     0.000        68   15.5888   77.1680   dash jump 
+   29  JUMP DASH R     0.000        68   16.0620   74.2911   dash jump 
+   30  SLIDE           0.000        68   16.5108  101.4600   slide 
+
+lifetime action usage:
+  total decisions: 9027920
+  action table:
+    idx  action          count    pct    yaw    pitch   flags
+    -------------------------------------------------------------
+      0  GOAL          710971    7.9%     0.0      0.0   move
+      1  TIGHT L      1165158   12.9%   -18.0      0.0   move
+      2  TIGHT R      1650879   18.3%    18.0      0.0   move
+      3  ARC L         278873    3.1%   -35.0      0.0   move
+      4  ARC R        1060697   11.7%    35.0      0.0   move
+      5  WIDE L       1154002   12.8%   -75.0      0.0   move
+      6  WIDE R        628475    7.0%    75.0      0.0   move
+      7  CUT L         265704    2.9%  -115.0      0.0   move
+      8  CUT R         467373    5.2%   115.0      0.0   move
+      9  DASH           17292    0.2%     0.0      0.0   dash 
+     10  DASH UP       175356    1.9%     0.0    -22.0   dash 
+     11  DASH DOWN       2550    0.0%     0.0     18.0   dash 
+     12  DASH UP L     129301    1.4%   -35.0    -22.0   dash 
+     13  DASH UP R       4968    0.1%    35.0    -22.0   dash 
+     14  DASH LOW L      2174    0.0%   -35.0     16.0   dash 
+     15  DASH LOW R      2515    0.0%    35.0     16.0   dash 
+     16  DASH T L        3163    0.0%   -18.0      0.0   dash 
+     17  DASH T R        1475    0.0%    18.0      0.0   dash 
+     18  DASH L          2453    0.0%   -35.0      0.0   dash 
+     19  DASH R          1657    0.0%    35.0      0.0   dash 
+     20  DASH W L        1307    0.0%   -75.0    -16.0   dash 
+     21  DASH W R       89133    1.0%    75.0    -16.0   dash 
+     22  JUMP          100741    1.1%     0.0    -12.0   jump 
+     23  JUMP L         11051    0.1%   -35.0    -10.0   jump 
+     24  JUMP R        211026    2.3%    35.0    -10.0   jump 
+     25  JUMP W L      126538    1.4%   -75.0    -10.0   jump 
+     26  JUMP W R      755077    8.4%    75.0    -10.0   jump 
+     27  JUMP DASH        738    0.0%     0.0    -18.0   dash jump 
+     28  JUMP DASH L     1674    0.0%   -35.0    -18.0   dash jump 
+     29  JUMP DASH R      844    0.0%    35.0    -18.0   dash jump 
+     30  SLIDE           4755    0.1%     0.0      8.0   slide 
+
+recent action usage:
+  total decisions: 7578
+  action table:
+    idx  action          count    pct    yaw    pitch   flags
+    -------------------------------------------------------------
+      0  GOAL             414    5.5%     0.0      0.0   move
+      1  TIGHT L         1212   16.0%   -18.0      0.0   move
+      2  TIGHT R         1443   19.0%    18.0      0.0   move
+      3  ARC L            387    5.1%   -35.0      0.0   move
+      4  ARC R            337    4.4%    35.0      0.0   move
+      5  WIDE L           977   12.9%   -75.0      0.0   move
+      6  WIDE R           495    6.5%    75.0      0.0   move
+      7  CUT L            428    5.6%  -115.0      0.0   move
+      8  CUT R            371    4.9%   115.0      0.0   move
+      9  DASH              10    0.1%     0.0      0.0   dash 
+     10  DASH UP          279    3.7%     0.0    -22.0   dash 
+     11  DASH DOWN          0    0.0%     0.0     18.0   dash 
+     12  DASH UP L         37    0.5%   -35.0    -22.0   dash 
+     13  DASH UP R         19    0.3%    35.0    -22.0   dash 
+     14  DASH LOW L         1    0.0%   -35.0     16.0   dash 
+     15  DASH LOW R         0    0.0%    35.0     16.0   dash 
+     16  DASH T L           0    0.0%   -18.0      0.0   dash 
+     17  DASH T R           0    0.0%    18.0      0.0   dash 
+     18  DASH L             0    0.0%   -35.0      0.0   dash 
+     19  DASH R             1    0.0%    35.0      0.0   dash 
+     20  DASH W L           0    0.0%   -75.0    -16.0   dash 
+     21  DASH W R          96    1.3%    75.0    -16.0   dash 
+     22  JUMP             140    1.8%     0.0    -12.0   jump 
+     23  JUMP L             4    0.1%   -35.0    -10.0   jump 
+     24  JUMP R           225    3.0%    35.0    -10.0   jump 
+     25  JUMP W L           0    0.0%   -75.0    -10.0   jump 
+     26  JUMP W R         693    9.1%    75.0    -10.0   jump 
+     27  JUMP DASH          0    0.0%     0.0    -18.0   dash jump 
+     28  JUMP DASH L        0    0.0%   -35.0    -18.0   dash jump 
+     29  JUMP DASH R        0    0.0%    35.0    -18.0   dash jump 
+     30  SLIDE              9    0.1%     0.0      8.0   slide 
+
+  recent episode log (last 160 stored episodes):
+    ep      outcome   time    reward    dist    walls   coll    decisions   top action
+    ----------------------------------------------------------------------------------
+     93203  STUCK     11.37   -298.56    5.27     15   30.93         95   TIGHT R
+     93204  SUCCESS   12.63    227.18    3.24     18   26.20        106   TIGHT R
+     93205  STUCK     10.15   -580.47    4.15     36   77.05         85   TIGHT L
+     93206  SUCCESS   14.00   -292.06    3.08     41   85.72        117   WIDE L
+     93207  SUCCESS    9.70    159.20    3.21     26   37.10         81   TIGHT R
+     93208  SUCCESS   13.28    -18.14    3.03     28   51.29        111   WIDE L
+     93209  SUCCESS   12.22    -47.97    3.17     51   50.94        102   WIDE L
+     93210  STUCK     11.63   -353.32   12.55     18   27.78         97   TIGHT R
+     93211  TIMEOUT   14.02   -743.95    5.33     50  104.00        117   WIDE L
+     93212  SUCCESS   10.83    277.28    2.95     23   22.74         91   TIGHT R
+     93213  STUCK     11.70   -633.12    4.36     44   81.96         98   TIGHT R
+     93214  SUCCESS   12.80  -1141.62    3.21     86  178.77        107   TIGHT L
+     93215  SUCCESS   13.37    -15.36    3.19     29   50.16        112   WIDE L
+     93216  SUCCESS   11.32    148.11    3.21     23   37.99         95   TIGHT L
+     93217  SUCCESS   12.32     57.90    3.21     29   38.19        103   TIGHT R
+     93218  STUCK     10.75   -611.02    4.09     41   81.00         90   TIGHT L
+     93219  TIMEOUT   14.02   -533.61    4.84     43   63.90        117   TIGHT R
+     93220  STUCK     10.00   -427.51    6.06     26   45.87         84   TIGHT R
+     93221  TIMEOUT   14.02  -1260.24    4.98     87  206.52        117   TIGHT L
+     93222  TIMEOUT   14.02   -499.39   11.17     38   53.74        117   TIGHT R
+     93223  SUCCESS   13.32   -283.50    3.22     48   78.74        111   TIGHT R
+     93224  SUCCESS    9.55     55.80    3.01     30   34.36         80   TIGHT L
+     93225  SUCCESS   11.68    189.03    3.06     22   30.21         98   WIDE L
+     93226  SUCCESS   10.07    278.41    3.07     25   20.97         84   TIGHT R
+     93227  STUCK     12.33   -575.30    3.67     42   68.00        103   TIGHT R
+     93228  TIMEOUT   14.02   -468.11    4.73     36   46.95        117   WIDE L
+     93229  SUCCESS   10.85   -167.49    3.23     43   74.14         91   TIGHT L
+     93230  SUCCESS   12.77     41.10    3.14     37   36.36        107   TIGHT L
+     93231  TIMEOUT   14.02  -1113.46    5.58     78  176.75        117   TIGHT R
+     93232  STUCK     11.98   -604.41    3.89     47   78.19        100   TIGHT R
+     93233  SUCCESS   11.58     49.50    3.11     33   44.73         97   TIGHT R
+     93234  SUCCESS   13.98   -487.55    3.04     62   98.20        117   TIGHT R
+     93235  TIMEOUT   14.02   -674.07    5.23     45   84.39        117   TIGHT L
+     93236  TIMEOUT   14.02   -521.58    9.73     39   56.24        117   TIGHT R
+     93237  SUCCESS   11.43   -212.22    3.11     28   82.81         96   TIGHT L
+     93238  SUCCESS    9.97    114.01    3.23     19   45.71         83   TIGHT R
+     93239  SUCCESS    9.93    204.54    3.02     20   29.90         83   TIGHT R
+     93240  SUCCESS    7.67    462.44    2.95      7   11.69         64   TIGHT R
+     93241  SUCCESS   13.60   -198.30    3.03     34   73.71        114   TIGHT L
+     93242  SUCCESS    9.72    -59.45    3.17     34   62.11         81   TIGHT L
+     93243  STUCK     11.07   -719.45    4.91     46   98.43         93   TIGHT L
+     93244  SUCCESS   12.07     26.71    3.21     28   46.82        101   TIGHT R
+     93245  SUCCESS   13.52    157.34    3.16     16   32.42        113   TIGHT L
+     93246  TIMEOUT   14.02  -1044.26    6.89     74  159.70        117   TIGHT L
+     93247  TIMEOUT   14.02   -803.69    4.52     63  117.21        117   WIDE L
+     93248  TIMEOUT   14.02   -441.21    6.21     35   47.39        117   TIGHT R
+     93249  SUCCESS   11.90   -109.12    3.15     46   61.91        100   TIGHT L
+     93250  STUCK     12.22   -498.50    4.49     33   50.79        102   TIGHT R
+     93251  STUCK     11.98   -335.02    9.71     16   24.03        100   CUT L
+     93252  TIMEOUT   14.02   -475.14   10.95     27   58.95        117   TIGHT L
+     93253  SUCCESS   13.87   -209.79    2.95     41   71.96        116   TIGHT R
+     93254  TIMEOUT   14.02   -444.34    5.46     31   50.54        117   TIGHT R
+     93255  SUCCESS    9.12    242.49    3.10     21   32.84         76   TIGHT R
+     93256  SUCCESS   10.13     99.51    3.12     24   44.40         85   TIGHT R
+     93257  STUCK     11.77   -470.79    4.18     34   51.47         98   TIGHT R
+     93258  STUCK     13.60   -671.01    5.56     48   78.64        114   TIGHT R
+     93259  TIMEOUT   14.02   -594.35    5.73     38   73.79        117   TIGHT L
+     93260  SUCCESS   12.43   -410.85    3.08     42  103.68        104   TIGHT L
+     93261  SUCCESS    9.48    185.49    3.13     20   37.69         79   TIGHT R
+     93262  SUCCESS    9.42    427.18    3.16      8   11.99         79   TIGHT R
+     93263  TIMEOUT   14.02   -391.01    5.61     30   40.53        117   WIDE L
+     93264  SUCCESS   10.47    195.77    3.17     20   30.18         88   TIGHT R
+     93265  SUCCESS    9.53   -394.46    3.07     42  108.76         80   TIGHT L
+     93266  TIMEOUT   14.02   -507.23    5.34     40   58.61        117   TIGHT L
+     93267  SUCCESS   11.15    169.15    3.25     20   34.57         93   TIGHT R
+     93268  TIMEOUT   14.02   -538.86    8.66     37   64.58        117   WIDE L
+     93269  STUCK     12.15   -439.80    9.63     19   50.64        102   WIDE L
+     93270  SUCCESS   13.63   -316.68    3.04     50   82.99        114   TIGHT R
+     93271  SUCCESS    8.53    347.57    2.99     15   18.62         71   TIGHT L
+     93272  TIMEOUT   14.02   -612.17    5.73     40   81.86        117   WIDE L
+     93273  SUCCESS    8.88    352.08    3.19     15   16.51         74   TIGHT R
+     93274  TIMEOUT   14.02   -405.84   10.30     20   34.77        117   TIGHT R
+     93275  SUCCESS    7.13    512.06    3.23      6    8.37         60   TIGHT R
+     93276  SUCCESS    8.08    427.26    3.09      5   14.32         68   TIGHT R
+     93277  SUCCESS   11.00   -243.61    3.17     45   81.11         92   TIGHT L
+     93278  SUCCESS    9.18    179.67    3.00     24   39.25         77   TIGHT R
+     93279  SUCCESS   10.27    -20.41    3.09     38   58.36         86   TIGHT L
+     93280  SUCCESS   10.63     11.97    3.10     30   49.44         89   TIGHT R
+     93281  TIMEOUT   14.02   -986.72    5.34     67  146.58        117   TIGHT R
+     93282  STUCK     10.92   -440.76    8.04     32   44.92         91   TIGHT R
+     93283  SUCCESS   11.23  -1584.06    3.20     88  245.86         94   TIGHT L
+     93284  SUCCESS    9.13    241.78    3.18     21   28.23         76   TIGHT R
+     93285  SUCCESS    8.45    412.74    3.18      9   13.83         71   TIGHT R
+     93286  SUCCESS   11.17   -979.44    3.23     72  168.43         93   TIGHT R
+     93287  STUCK     13.98   -434.23    6.76     26   33.57        117   CUT L
+     93288  SUCCESS   10.25   -412.19    3.12     62   99.18         86   TIGHT L
+     93289  SUCCESS   11.27     -9.98    3.21     26   55.06         94   TIGHT R
+     93290  SUCCESS   11.15    -73.08    3.02     34   64.47         93   TIGHT R
+     93291  SUCCESS   12.20    -74.19    3.11     40   55.82        102   TIGHT R
+     93292  SUCCESS   10.43    -85.41    3.23     37   63.93         87   TIGHT L
+     93293  SUCCESS   10.40   -195.57    3.06     40   77.09         87   TIGHT R
+     93294  SUCCESS   11.10    230.97    2.98     17   28.21         93   TIGHT L
+     93295  TIMEOUT   14.02   -467.18    4.81     36   53.55        117   WIDE L
+     93296  STUCK     12.53   -675.39    6.10     38   87.56        105   TIGHT R
+     93297  TIMEOUT   14.02   -857.63    5.38     60  130.06        117   TIGHT R
+     93298  TIMEOUT   14.02   -433.57    7.72     23   51.22        117   TIGHT L
+     93299  SUCCESS   11.72    171.52    3.14     28   31.45         98   TIGHT L
+     93300  SUCCESS    8.97    -57.65    3.19     36   63.91         75   TIGHT L
+     93301  TIMEOUT   14.02   -930.60    6.31     77  131.84        117   GOAL
+     93302  SUCCESS    8.98    277.75    3.23     14   27.29         75   TIGHT L
+     93303  STUCK     12.48   -713.64    3.57     55   92.09        104   TIGHT L
+     93304  SUCCESS   10.27   -182.38    3.16     34   78.32         86   TIGHT L
+     93305  SUCCESS   12.90    187.10    3.17     28   27.35        108   WIDE L
+     93306  TIMEOUT   14.02   -652.22   10.30     52   76.62        117   TIGHT R
+     93307  SUCCESS    9.78    324.93    3.17     12   22.27         82   TIGHT R
+     93308  TIMEOUT   14.02   -769.58    3.79     47  122.86        117   TIGHT R
+     93309  TIMEOUT   14.02   -829.32    4.55     61  123.03        117   TIGHT L
+     93310  TIMEOUT   14.02   -282.46    4.01     25   23.35        117   WIDE L
+     93311  STUCK      6.30   -526.52   74.32     13   36.23         53   TIGHT R
+     93312  SUCCESS   11.03     32.70    3.22     41   43.75         92   TIGHT L
+     93313  STUCK     11.77   -427.87    4.03     37   41.49         98   TIGHT R
+     93314  STUCK     12.70   -633.02    5.08     36   85.66        106   TIGHT R
+     93315  SUCCESS    9.33    347.39    2.98     14   18.39         78   TIGHT L
+     93316  SUCCESS   10.68    101.43    3.20     18   44.69         89   TIGHT R
+     93317  SUCCESS    9.67    332.22    3.18     24   18.97         81   TIGHT L
+     93318  TIMEOUT   14.02   -781.93    5.84     55  106.20        117   WIDE L
+     93319  STUCK     11.48   -290.67    5.43     27   20.56         96   TIGHT R
+     93320  STUCK     12.72   -721.33    3.83     63   89.30        106   TIGHT R
+     93321  SUCCESS    7.47    441.70    3.19      8   13.49         63   TIGHT R
+     93322  SUCCESS   12.97   -131.99    3.12     52   62.27        108   TIGHT L
+     93323  STUCK     12.78   -605.12    6.17     32   81.55        107   WIDE L
+     93324  SUCCESS   10.73   -531.14    3.08     49  115.85         90   TIGHT L
+     93325  STUCK     11.23   -648.23    7.34     52   80.56         94   TIGHT L
+     93326  SUCCESS    9.47    235.06    3.16     24   28.49         79   TIGHT R
+     93327  SUCCESS   10.92    -93.85    3.10     32   65.92         91   WIDE L
+     93328  SUCCESS    8.38    -56.09    2.97     23   69.55         70   TIGHT R
+     93329  STUCK     12.48   -549.37    4.80     42   60.51        104   WIDE L
+     93330  STUCK     13.73   -482.90    9.23     24   47.10        115   TIGHT R
+     93331  STUCK     10.17   -476.71    7.72     26   55.67         85   TIGHT L
+     93332  SUCCESS    7.67    422.64    3.24      7   15.08         64   TIGHT L
+     93333  TIMEOUT   14.02   -632.94    4.91     40   86.11        117   WIDE L
+     93334  STUCK     11.68   -653.69    7.34     43   86.57         98   WIDE L
+     93335  STUCK     12.48   -933.21    3.66     49  143.09        104   WIDE L
+     93336  SUCCESS   10.22   -555.96    3.12     49  124.12         86   TIGHT R
+     93337  SUCCESS   12.27     57.90    3.20     29   39.82        103   TIGHT R
+     93338  SUCCESS    9.22    269.25    3.17     18   26.12         77   TIGHT L
+     93339  SUCCESS   12.45    111.07    3.19     28   35.10        104   WIDE L
+     93340  SUCCESS   12.75    232.41    3.23     15   23.40        107   WIDE L
+     93341  SUCCESS    6.37    430.28    3.08     10   16.51         53   TIGHT L
+     93342  SUCCESS    7.98    180.90    2.99     25   40.01         67   TIGHT L
+     93343  SUCCESS   11.00    176.82    3.00     23   33.54         92   TIGHT L
+     93344  STUCK     12.48   -613.00    7.04     42   75.79        104   WIDE L
+     93345  SUCCESS   10.40    100.03    3.05     28   43.60         87   TIGHT L
+     93346  SUCCESS   11.88   -371.39    3.20     57   93.35         99   TIGHT R
+     93347  SUCCESS   11.28    129.18    3.21     27   37.71         94   TIGHT R
+     93348  STUCK     12.25   -504.17    7.54     33   55.83        102   TIGHT R
+     93349  SUCCESS   13.22   -390.06    3.17     62   87.27        111   TIGHT R
+     93350  SUCCESS   10.17    369.79    3.14     11   15.87         85   TIGHT R
+     93351  TIMEOUT   14.02   -487.49    8.47     32   58.47        117   TIGHT R
+     93352  STUCK     13.92   -468.94    7.97     27   46.57        116   TIGHT L
+     93353  STUCK     11.70   -472.59   11.09     36   52.11         98   TIGHT L
+     93354  TIMEOUT   14.02   -705.59    5.02     50   99.35        117   WIDE L
+     93355  STUCK     11.30   -426.02    4.99     28   48.52         95   TIGHT L
+     93356  STUCK      5.00   -493.27   68.47     28   35.30         42   TIGHT R
+     93357  SUCCESS    9.38    314.84    3.03     21   21.57         79   WIDE R
+     93358  STUCK     11.12   -544.05    4.48     34   65.54         93   TIGHT R
+     93359  SUCCESS   10.85    177.07    3.23     24   34.04         91   TIGHT L
+     93360  SUCCESS   11.78   -389.60    3.23     63   91.84         99   TIGHT R
+     93361  STUCK     13.73   -563.17    6.06     43   61.68        115   TIGHT R
+     93362  SUCCESS    9.33    143.41    2.98     22   40.01         78   TIGHT R
+
+
+================================================================================
+MODEL 1: Explorer
+================================================================================
+identity:
+  selected: no
+  trainer-ranked best: no
+  reliable selection score: 39872.91
+  color rgba: (255, 161, 0, 255)
+
+lifetime outcomes:
+  episodes started: 95352
+  finished episodes: 95351
+  successes: 49346 (51.8%)
+  timeouts: 16680 (17.5%)
+  stucks: 29325 (30.8%)
+  episodes since best improvement: 681
+  best reward seen: 604.017
+  best success reward: 570.720
+  best success time: 6.083s
+  best replay duration: 6.083s
+  best replay frames/trail: 147 frames, 116 trail points
+
+current live episode:
+  current action: CUT R
+  episode time: 7.467s / 14.000s
+  episode reward: 41.799
+  last step reward: -3.505
+  distance to goal: 8.113m
+  wall hits: 13
+  collision cost: 25.774
+  position: (-4.55, 0.90, -45.28)
+  velocity: (-7.41, 0.00, 2.05)
+
+learning parameters:
+  learning rate: 0.050
+  discount: 0.950
+  epsilon/current floor decay: 0.006 / 0.006 / 0.999
+  decision interval: 0.110s
+  turn rate: 360.000 deg/s
+  clearance guidance: 0.180
+  raw feature count: 33
+  encoded feature count: 67
+  replay memory: 24000 / 24000
+  elite memory: 4000 / 4000
+  manual guidance: 5 replays, 3990 samples
+  best-run anchor: 56 samples, 463349 rehearsed updates
+  best-path reward: current episode 7.917, lifetime 317760.469, last step -0.019
+  best policy saved: yes
+  last TD error: -10.959
+
+recent 80 episode aggregate:
+  successes: 47 (58.8%)
+  timeouts: 8 (10.0%)
+  stucks: 25 (31.2%)
+  average reward: -137.757
+  average episode time: 11.000s
+  average successful time: 10.445s
+  best recent success time: 7.567s
+  average distance remaining: 4.983m
+  average wall hits: 30.275
+  average collision cost: 50.989
+  average decisions: 100.438
+
+  readout and recommendations:
+    - Best run is much faster than average recent successes. Treat the best replay as a rare peak, not the model's normal performance.
+    - Stuck rate is high. Penalize low speed/no-progress harder after wall contact and consider reducing dash-heavy action bias for this model.
+    - Wall contact is expensive for learning quality. RL treats wallruns as a fallback except for productive final-cube climbs; keep rewarding clear forward progress and down-rank dash actions when clearance is low.
+    - Replay memory is near capacity. If training lags, lower memory capacity or replay batch counts before adding more actions/features.
+    - Program is CPU-budget limited at this speed setting. The label is not real sim speed; use actual speed, solo mode, and fewer active runners when benchmarking.
+    - Model has gone many episodes without improving. Increase elite replay/blend frequency or briefly raise epsilon to escape the local policy.
+
+learned action parameter snapshot:
+  idx  action           bias     weights   avg |w|   max |w|   last flag
+  -----------------------------------------------------------------------
+    0  GOAL            0.000        68   21.3228  244.4306   move
+    1  TIGHT L         0.000        68   21.2797  183.1853   move
+    2  TIGHT R         0.000        68   21.1094  149.3732   move
+    3  ARC L           0.000        68   22.4438  211.0471   move
+    4  ARC R           0.000        68   22.8499  219.5321   move
+    5  WIDE L          0.000        68   25.3838  232.5195   move
+    6  WIDE R          0.000        68   19.8694  199.8117   move
+    7  CUT L           0.000        68   17.7499  152.6140   move
+    8  CUT R           0.000        68   25.3978  254.3520   move
+    9  DASH            0.000        68   11.7790   57.0273   dash 
+   10  DASH UP         0.000        68   20.3834  100.1933   dash 
+   11  DASH DOWN       0.000        68   21.5153  101.3763   dash 
+   12  DASH UP L       0.000        68   14.0246  113.1131   dash 
+   13  DASH UP R       0.000        68   38.6248  168.0304   dash 
+   14  DASH LOW L      0.000        68   11.9125   67.3849   dash 
+   15  DASH LOW R      0.000        68   11.1981   62.0496   dash 
+   16  DASH T L        0.000        68   12.5518   58.6053   dash 
+   17  DASH T R        0.000        68   11.3552   50.8514   dash 
+   18  DASH L          0.000        68   11.5625   67.2799   dash 
+   19  DASH R          0.000        68   11.8311   62.1718   dash 
+   20  DASH W L        0.000        68   12.7137  101.1771   dash 
+   21  DASH W R        0.000        68   13.7935  107.5198   dash 
+   22  JUMP            0.000        68   26.7164  256.0732   jump 
+   23  JUMP L          0.000        68   13.2738   92.5632   jump 
+   24  JUMP R          0.000        68   13.7770  119.4692   jump 
+   25  JUMP W L        0.000        68   17.5789   93.8753   jump 
+   26  JUMP W R        0.000        68   19.0513  176.0448   jump 
+   27  JUMP DASH       0.000        68   11.7252   51.9384   dash jump 
+   28  JUMP DASH L     0.000        68   12.0774   62.2550   dash jump 
+   29  JUMP DASH R     0.000        68   11.1186   53.4420   dash jump 
+   30  SLIDE           0.000        68   13.1988   81.4439   slide 
+
+lifetime action usage:
+  total decisions: 9851463
+  action table:
+    idx  action          count    pct    yaw    pitch   flags
+    -------------------------------------------------------------
+      0  GOAL         2075481   21.1%     0.0      0.0   move
+      1  TIGHT L      1135676   11.5%   -18.0      0.0   move
+      2  TIGHT R       528754    5.4%    18.0      0.0   move
+      3  ARC L         942837    9.6%   -35.0      0.0   move
+      4  ARC R         830029    8.4%    35.0      0.0   move
+      5  WIDE L        711638    7.2%   -75.0      0.0   move
+      6  WIDE R        238566    2.4%    75.0      0.0   move
+      7  CUT L         152474    1.5%  -115.0      0.0   move
+      8  CUT R        1626465   16.5%   115.0      0.0   move
+      9  DASH            3137    0.0%     0.0      0.0   dash 
+     10  DASH UP       204069    2.1%     0.0    -22.0   dash 
+     11  DASH DOWN      14066    0.1%     0.0     18.0   dash 
+     12  DASH UP L      15313    0.2%   -35.0    -22.0   dash 
+     13  DASH UP R     128573    1.3%    35.0    -22.0   dash 
+     14  DASH LOW L      2532    0.0%   -35.0     16.0   dash 
+     15  DASH LOW R      2013    0.0%    35.0     16.0   dash 
+     16  DASH T L        4788    0.0%   -18.0      0.0   dash 
+     17  DASH T R        2282    0.0%    18.0      0.0   dash 
+     18  DASH L          2542    0.0%   -35.0      0.0   dash 
+     19  DASH R          3154    0.0%    35.0      0.0   dash 
+     20  DASH W L       10791    0.1%   -75.0    -16.0   dash 
+     21  DASH W R       10742    0.1%    75.0    -16.0   dash 
+     22  JUMP          863537    8.8%     0.0    -12.0   jump 
+     23  JUMP L          5129    0.1%   -35.0    -10.0   jump 
+     24  JUMP R         19953    0.2%    35.0    -10.0   jump 
+     25  JUMP W L      165218    1.7%   -75.0    -10.0   jump 
+     26  JUMP W R      147045    1.5%    75.0    -10.0   jump 
+     27  JUMP DASH        578    0.0%     0.0    -18.0   dash jump 
+     28  JUMP DASH L      662    0.0%   -35.0    -18.0   dash jump 
+     29  JUMP DASH R      437    0.0%    35.0    -18.0   dash jump 
+     30  SLIDE           2982    0.0%     0.0      8.0   slide 
+
+recent action usage:
+  total decisions: 8035
+  action table:
+    idx  action          count    pct    yaw    pitch   flags
+    -------------------------------------------------------------
+      0  GOAL            2123   26.4%     0.0      0.0   move
+      1  TIGHT L          854   10.6%   -18.0      0.0   move
+      2  TIGHT R          217    2.7%    18.0      0.0   move
+      3  ARC L            271    3.4%   -35.0      0.0   move
+      4  ARC R            879   10.9%    35.0      0.0   move
+      5  WIDE L           713    8.9%   -75.0      0.0   move
+      6  WIDE R           222    2.8%    75.0      0.0   move
+      7  CUT L            203    2.5%  -115.0      0.0   move
+      8  CUT R           1177   14.6%   115.0      0.0   move
+      9  DASH               0    0.0%     0.0      0.0   dash 
+     10  DASH UP          204    2.5%     0.0    -22.0   dash 
+     11  DASH DOWN          3    0.0%     0.0     18.0   dash 
+     12  DASH UP L         18    0.2%   -35.0    -22.0   dash 
+     13  DASH UP R        144    1.8%    35.0    -22.0   dash 
+     14  DASH LOW L         0    0.0%   -35.0     16.0   dash 
+     15  DASH LOW R         3    0.0%    35.0     16.0   dash 
+     16  DASH T L           0    0.0%   -18.0      0.0   dash 
+     17  DASH T R           0    0.0%    18.0      0.0   dash 
+     18  DASH L             2    0.0%   -35.0      0.0   dash 
+     19  DASH R             3    0.0%    35.0      0.0   dash 
+     20  DASH W L           3    0.0%   -75.0    -16.0   dash 
+     21  DASH W R           8    0.1%    75.0    -16.0   dash 
+     22  JUMP             706    8.8%     0.0    -12.0   jump 
+     23  JUMP L            77    1.0%   -35.0    -10.0   jump 
+     24  JUMP R            15    0.2%    35.0    -10.0   jump 
+     25  JUMP W L         103    1.3%   -75.0    -10.0   jump 
+     26  JUMP W R          87    1.1%    75.0    -10.0   jump 
+     27  JUMP DASH          0    0.0%     0.0    -18.0   dash jump 
+     28  JUMP DASH L        0    0.0%   -35.0    -18.0   dash jump 
+     29  JUMP DASH R        0    0.0%    35.0    -18.0   dash jump 
+     30  SLIDE              0    0.0%     0.0      8.0   slide 
+
+  recent episode log (last 160 stored episodes):
+    ep      outcome   time    reward    dist    walls   coll    decisions   top action
+    ----------------------------------------------------------------------------------
+     95192  SUCCESS    7.55    215.87    3.22     18   41.40         69   GOAL
+     95193  TIMEOUT   14.02   -667.19    5.15     44   95.15        128   GOAL
+     95194  STUCK     12.75   -516.03    4.80     34   60.25        116   GOAL
+     95195  SUCCESS    8.93    -36.35    3.23     32   68.76         82   GOAL
+     95196  SUCCESS   10.27    218.49    3.18     18   31.16         94   GOAL
+     95197  SUCCESS   10.38    297.96    3.25     19   21.13         95   GOAL
+     95198  SUCCESS   10.15    209.87    3.16     23   32.23         93   GOAL
+     95199  SUCCESS   10.82    146.78    3.21     22   39.83         99   GOAL
+     95200  STUCK     10.25   -398.18    4.20     21   46.46         94   GOAL
+     95201  SUCCESS    7.05    515.79    3.11      6    8.06         64   GOAL
+     95202  SUCCESS    9.33    486.54    2.93      5    7.82         85   GOAL
+     95203  STUCK     12.68   -815.49   11.74     45  109.46        116   CUT R
+     95204  SUCCESS    9.43    338.29    3.22     17   21.36         86   GOAL
+     95205  STUCK     11.88   -721.22    4.20     41  104.80        108   GOAL
+     95206  STUCK     11.93   -391.75    4.73     24   41.91        109   GOAL
+     95207  TIMEOUT   14.02   -492.58    5.34     42   56.54        128   GOAL
+     95208  SUCCESS   11.22     39.00    3.16     38   41.92        102   GOAL
+     95209  STUCK     10.55   -214.75    5.86     11   11.82         96   GOAL
+     95210  STUCK     10.42   -291.20    9.64     16   26.10         95   GOAL
+     95211  SUCCESS   12.42   -206.64    3.19     43   75.93        113   WIDE L
+     95212  TIMEOUT   14.02   -332.14    7.58     25   27.13        128   GOAL
+     95213  STUCK     11.30   -419.90    5.13     27   47.76        103   GOAL
+     95214  STUCK     13.60   -245.09    4.83     13   17.08        124   WIDE L
+     95215  SUCCESS    7.18    501.79    3.14      7    8.46         66   GOAL
+     95216  SUCCESS   11.08    181.93    3.22     15   36.66        101   GOAL
+     95217  TIMEOUT   14.02   -625.29    3.49     58   84.25        128   GOAL
+     95218  SUCCESS   13.90   -317.59    3.15     48   84.34        127   GOAL
+     95219  SUCCESS    8.50    225.72    3.18     17   38.75         78   GOAL
+     95220  SUCCESS    8.12    454.75    3.08     10   11.02         74   GOAL
+     95221  SUCCESS   10.40     22.61    3.18     42   49.06         95   CUT R
+     95222  STUCK     12.13   -299.88    7.98     16   25.24        111   GOAL
+     95223  SUCCESS   11.15    118.63    3.08     21   45.25        102   GOAL
+     95224  SUCCESS   11.17    320.03    3.17     21   17.43        102   GOAL
+     95225  SUCCESS   10.10    190.49    3.10     15   38.71         92   GOAL
+     95226  SUCCESS   10.32    367.38    3.05     13   15.47         94   GOAL
+     95227  SUCCESS    9.83    411.20    3.09     11   11.16         90   GOAL
+     95228  STUCK     12.53   -899.02    4.43     62  129.88        114   GOAL
+     95229  STUCK     12.55   -428.21    5.29     41   41.15        114   GOAL
+     95230  TIMEOUT   14.02   -497.66    5.28     28   66.80        128   GOAL
+     95231  STUCK     12.18   -357.83    4.09     29   31.19        111   GOAL
+     95232  STUCK     11.08   -601.82    9.91     37   74.61        101   CUT R
+     95233  STUCK     10.75   -436.76    5.69     40   44.87         98   GOAL
+     95234  STUCK     13.92  -1530.22    4.99     98  232.34        127   GOAL
+     95235  SUCCESS   13.03   -142.48    3.15     42   60.93        119   GOAL
+     95236  STUCK     12.35  -1041.70    3.75     69  159.01        113   GOAL
+     95237  STUCK     11.62   -522.39    3.75     27   62.89        106   GOAL
+     95238  SUCCESS   12.22   -127.96    3.24     39   63.08        111   GOAL
+     95239  SUCCESS   12.40    -13.34    3.23     35   53.90        113   GOAL
+     95240  SUCCESS   11.07    183.78    3.03     19   33.70        101   GOAL
+     95241  SUCCESS   10.80   -185.81    3.15     36   81.62         99   GOAL
+     95242  SUCCESS   10.45    268.76    3.20     14   29.33         95   GOAL
+     95243  SUCCESS   11.17    -67.24    3.13     30   67.25        102   GOAL
+     95244  STUCK      7.33   -641.26   47.25     33   70.16         67   GOAL
+     95245  STUCK     11.45   -545.44    5.55     33   67.77        104   GOAL
+     95246  TIMEOUT   14.02   -614.99    3.81     56   84.23        128   GOAL
+     95247  SUCCESS   13.37   -581.96    3.21     54  118.53        122   GOAL
+     95248  SUCCESS   12.47    -21.69    3.22     35   57.28        114   GOAL
+     95249  STUCK     10.03   -332.36    5.06     18   32.74         92   GOAL
+     95250  STUCK     11.08   -323.09    5.19     22   30.28        101   GOAL
+     95251  SUCCESS   11.47   -143.35    3.18     41   68.94        105   GOAL
+     95252  SUCCESS   10.40    187.54    3.20     28   32.38         95   GOAL
+     95253  SUCCESS   13.08    -82.12    3.19     37   58.94        119   GOAL
+     95254  STUCK     12.65   -614.80    4.60     35   84.95        115   GOAL
+     95255  STUCK     13.15   -527.09    5.10     32   67.19        120   GOAL
+     95256  STUCK     10.87   -259.88    4.96     18   18.03         99   GOAL
+     95257  STUCK     13.02   -590.40    3.95     44   63.34        119   GOAL
+     95258  SUCCESS   10.68    405.55    3.19      7   11.85         97   GOAL
+     95259  TIMEOUT   14.02   -464.27    4.41     31   56.83        128   CUT R
+     95260  TIMEOUT   14.02   -547.58    4.65     40   64.14        128   GOAL
+     95261  STUCK     13.23   -547.18    5.32     33   64.64        121   GOAL
+     95262  SUCCESS   12.67    146.43    3.23     26   35.30        116   GOAL
+     95263  SUCCESS   11.50     43.20    3.06     36   38.14        105   GOAL
+     95264  TIMEOUT   14.02   -667.21    6.37     47   86.44        128   GOAL
+     95265  TIMEOUT   14.02   -817.46    4.61     55  113.27        128   GOAL
+     95266  STUCK     12.33   -510.70    4.67     36   53.63        112   GOAL
+     95267  STUCK     12.68   -507.04   11.79     30   61.42        116   GOAL
+     95268  SUCCESS   11.45    201.81    3.17     28   30.59        104   GOAL
+     95269  SUCCESS   12.93    133.90    3.22     27   35.00        118   GOAL
+     95270  STUCK     10.08   -513.96   16.71     27   64.56         92   GOAL
+     95271  SUCCESS   12.45     12.86    3.06     34   48.73        114   GOAL
+     95272  STUCK     10.53   -260.87    4.76     16   17.03         96   GOAL
+     95273  TIMEOUT   14.02   -927.71    7.82     63  142.82        128   ARC R
+     95274  TIMEOUT   14.02   -462.53    4.87     43   59.69        128   GOAL
+     95275  SUCCESS   11.08    148.24    3.11     23   42.36        101   GOAL
+     95276  SUCCESS   10.80    206.86    3.17     20   35.79         99   GOAL
+     95277  SUCCESS    8.83    174.50    3.18     23   40.69         81   GOAL
+     95278  SUCCESS    9.55    349.07    3.11     13   19.64         87   GOAL
+     95279  SUCCESS    7.97    435.33    3.23     12   12.42         73   GOAL
+     95280  SUCCESS   12.13    -15.18    3.24     29   55.38        111   GOAL
+     95281  SUCCESS    9.05    212.04    3.15     21   37.75         83   GOAL
+     95282  STUCK     11.48  -1075.24    5.74     81  159.27        105   GOAL
+     95283  STUCK     10.12   -399.12    4.75     28   44.15         92   GOAL
+     95284  SUCCESS   12.18    148.65    3.11     19   37.87        111   GOAL
+     95285  STUCK     10.82   -408.65    4.64     29   44.40         99   GOAL
+     95286  TIMEOUT   14.02   -409.64    3.63     35   41.32        128   WIDE L
+     95287  SUCCESS   11.28     72.24    3.00     25   51.87        103   GOAL
+     95288  SUCCESS    7.57    478.50    3.04     11    9.46         69   GOAL
+     95289  SUCCESS    9.33    342.05    3.24     15   21.40         85   GOAL
+     95290  SUCCESS    8.55    369.73    3.14     16   19.01         78   GOAL
+     95291  SUCCESS   12.12     39.00    3.20     38   44.54        111   CUT R
+     95292  SUCCESS   10.38    307.18    3.24     14   20.68         95   GOAL
+     95293  SUCCESS   11.80   -377.10    3.11     64   93.92        108   GOAL
+     95294  SUCCESS   10.32    184.60    3.05     22   36.24         94   GOAL
+     95295  STUCK     12.57   -518.72    5.29     41   53.68        115   GOAL
+     95296  SUCCESS   12.90   -183.88    3.14     44   70.17        118   GOAL
+     95297  SUCCESS   11.35    138.22    3.14     25   41.34        104   GOAL
+     95298  SUCCESS    8.27    468.17    3.22      9    9.86         76   GOAL
+     95299  STUCK     11.15   -518.15    5.95     44   55.71        102   GOAL
+     95300  SUCCESS    7.98    351.79    3.20     13   23.02         73   GOAL
+     95301  SUCCESS    9.88    255.15    3.13     16   30.48         90   GOAL
+     95302  SUCCESS   10.50    214.21    3.23     19   32.65         96   GOAL
+     95303  SUCCESS    7.58    447.33    3.24     16    9.67         69   GOAL
+     95304  STUCK      8.30   -492.35   45.82     25   42.83         76   GOAL
+     95305  STUCK     11.57   -416.72    7.00     32   36.36        106   GOAL
+     95306  SUCCESS   10.87     53.70    3.07     31   44.18         99   GOAL
+     95307  SUCCESS   13.10    244.84    3.08     18   22.99        119   GOAL
+     95308  SUCCESS   10.65    186.14    3.17     26   36.01         97   GOAL
+     95309  SUCCESS    8.02    507.08    3.10      5    7.92         73   GOAL
+     95310  STUCK     12.77   -945.78   11.48     51  131.88        116   CUT R
+     95311  SUCCESS   11.20     18.44    3.16     26   51.73        102   GOAL
+     95312  SUCCESS   10.48    -27.60    3.03     32   60.04         96   GOAL
+     95313  SUCCESS   13.02    120.73    3.22     25   38.15        119   GOAL
+     95314  STUCK     12.40   -677.94    4.33     46   86.41        113   GOAL
+     95315  SUCCESS   11.37   -251.33    3.23     42   81.82        104   GOAL
+     95316  SUCCESS   12.55    -51.22    3.18     42   53.16        114   GOAL
+     95317  SUCCESS    9.12    168.95    3.20     22   38.55         83   GOAL
+     95318  STUCK     13.07   -594.26    4.99     40   72.24        119   GOAL
+     95319  SUCCESS   11.22    291.80    3.12     14   19.76        102   GOAL
+     95320  TIMEOUT   14.02   -874.42    3.52     56  135.13        128   TIGHT L
+     95321  STUCK     10.22   -511.03    5.15     35   64.72         93   GOAL
+     95322  STUCK      8.82   -488.24   11.44     24   63.50         81   CUT R
+     95323  SUCCESS   13.60      0.79    3.19     34   51.66        124   GOAL
+     95324  STUCK     10.63   -312.56    4.20     39   21.13         97   GOAL
+     95325  SUCCESS   13.12   -469.75    3.25     50  100.90        120   GOAL
+     95326  SUCCESS    7.92    469.13    3.19      8    9.58         72   GOAL
+     95327  SUCCESS   11.48     28.50    3.07     43   42.74        105   GOAL
+     95328  SUCCESS   10.48    -18.25    3.10     34   58.80         96   GOAL
+     95329  SUCCESS    8.38    467.05    3.25      9    8.94         77   GOAL
+     95330  STUCK     12.62   -521.28   11.63     42   56.97        115   GOAL
+     95331  SUCCESS   12.07    -27.41    3.14     31   55.43        110   GOAL
+     95332  STUCK      8.93   -434.74    7.65     24   54.39         82   GOAL
+     95333  SUCCESS    7.68    385.72    3.24     13   19.21         70   GOAL
+     95334  TIMEOUT   14.02   -705.27    5.51     46  101.23        128   GOAL
+     95335  TIMEOUT   14.02   -621.60    4.54     38   93.95        128   CUT R
+     95336  STUCK     13.77   -501.97    4.42     39   47.60        126   GOAL
+     95337  STUCK     13.02   -851.36    5.64     61  115.13        119   GOAL
+     95338  STUCK      9.78   -362.12    7.05     23   35.18         89   GOAL
+     95339  SUCCESS    8.15    420.91    3.13     12   12.90         74   GOAL
+     95340  STUCK     12.50   -703.12   11.65     39   92.40        114   GOAL
+     95341  STUCK      8.72   -199.93   10.69      4    7.44         80   CUT R
+     95342  TIMEOUT   14.02   -434.61    6.57     40   47.75        128   CUT R
+     95343  STUCK      9.00   -343.33    7.86     23   37.28         82   GOAL
+     95344  STUCK     12.32   -406.95    5.19     29   42.96        112   GOAL
+     95345  SUCCESS   10.03    397.82    3.12      7   13.21         92   GOAL
+     95346  STUCK     11.27   -765.22    7.24     53  104.35        103   GOAL
+     95347  TIMEOUT   14.02   -437.54    4.53     45   54.19        128   GOAL
+     95348  STUCK     10.58   -546.55    4.59     35   67.07         97   GOAL
+     95349  SUCCESS   11.45   -183.43    3.24     41   78.16        104   GOAL
+     95350  SUCCESS   12.35     53.70    3.18     31   44.52        113   GOAL
+     95351  SUCCESS   11.18   -444.09    3.21     50  102.41        102   GOAL
+
+
+================================================================================
+MODEL 2: Sprinter
+================================================================================
+identity:
+  selected: no
+  trainer-ranked best: no
+  reliable selection score: 35006.48
+  color rgba: (0, 158, 47, 255)
+
+lifetime outcomes:
+  episodes started: 94998
+  finished episodes: 94997
+  successes: 43326 (45.6%)
+  timeouts: 14069 (14.8%)
+  stucks: 37602 (39.6%)
+  episodes since best improvement: 454
+  best reward seen: 634.245
+  best success reward: 634.245
+  best success time: 6.050s
+  best replay duration: 6.050s
+  best replay frames/trail: 146 frames, 119 trail points
+
+current live episode:
+  current action: GOAL
+  episode time: 11.517s / 14.000s
+  episode reward: -108.989
+  last step reward: -0.545
+  distance to goal: 3.644m
+  wall hits: 36
+  collision cost: 70.503
+  position: (-1.17, 3.99, -48.55)
+  velocity: (13.64, -6.58, -0.00)
+
+learning parameters:
+  learning rate: 0.065
+  discount: 0.950
+  epsilon/current floor decay: 0.006 / 0.006 / 0.999
+  decision interval: 0.100s
+  turn rate: 360.000 deg/s
+  clearance guidance: 0.180
+  raw feature count: 33
+  encoded feature count: 67
+  replay memory: 24000 / 24000
+  elite memory: 4000 / 4000
+  manual guidance: 5 replays, 3990 samples
+  best-run anchor: 61 samples, 430915 rehearsed updates
+  best-path reward: current episode 8.497, lifetime 207265.359, last step 0.007
+  best policy saved: yes
+  last TD error: -55.000
+
+recent 80 episode aggregate:
+  successes: 41 (51.2%)
+  timeouts: 11 (13.8%)
+  stucks: 28 (35.0%)
+  average reward: -187.823
+  average episode time: 11.277s
+  average successful time: 10.491s
+  best recent success time: 7.133s
+  average distance remaining: 5.418m
+  average wall hits: 28.750
+  average collision cost: 49.931
+  average decisions: 112.975
+
+  readout and recommendations:
+    - Best run is much faster than average recent successes. Treat the best replay as a rare peak, not the model's normal performance.
+    - Stuck rate is high. Penalize low speed/no-progress harder after wall contact and consider reducing dash-heavy action bias for this model.
+    - Wall contact is expensive for learning quality. RL treats wallruns as a fallback except for productive final-cube climbs; keep rewarding clear forward progress and down-rank dash actions when clearance is low.
+    - Replay memory is near capacity. If training lags, lower memory capacity or replay batch counts before adding more actions/features.
+    - Program is CPU-budget limited at this speed setting. The label is not real sim speed; use actual speed, solo mode, and fewer active runners when benchmarking.
+
+learned action parameter snapshot:
+  idx  action           bias     weights   avg |w|   max |w|   last flag
+  -----------------------------------------------------------------------
+    0  GOAL            0.000        68   31.7315  271.8109   move
+    1  TIGHT L         0.000        68   29.3384  229.6495   move
+    2  TIGHT R         0.000        68   29.8210  228.7257   move
+    3  ARC L           0.000        68   26.8116  208.5642   move
+    4  ARC R           0.000        68   29.4156  235.2441   move
+    5  WIDE L          0.000        68   20.9005  220.5497   move
+    6  WIDE R          0.000        68   22.8766  230.2703   move
+    7  CUT L           0.000        68   22.6224  266.8177   move
+    8  CUT R           0.000        68   20.7322  153.7424   move
+    9  DASH            0.140        68   16.4808   60.4690   dash 
+   10  DASH UP         0.060        68   23.8142  160.8202   dash 
+   11  DASH DOWN       0.000        68   12.6238   66.7132   dash 
+   12  DASH UP L       0.055        68   17.5112  137.4583   dash 
+   13  DASH UP R       0.055        68   22.2008  156.4113   dash 
+   14  DASH LOW L      0.000        68   11.8801   85.0253   dash 
+   15  DASH LOW R      0.000        68   10.9065   73.1022   dash 
+   16  DASH T L        0.090        68   12.4081   75.0636   dash 
+   17  DASH T R        0.090        68   12.1624   92.5145   dash 
+   18  DASH L          0.080        68   11.8716   74.8495   dash 
+   19  DASH R          0.080        68   12.7490   84.2400   dash 
+   20  DASH W L        0.050        68   12.9490  103.5853   dash 
+   21  DASH W R        0.050        68   22.7292  170.0332   dash 
+   22  JUMP            0.000        68   12.6974  100.9686   jump 
+   23  JUMP L          0.000        68   24.5175  202.1346   jump 
+   24  JUMP R          0.000        68   28.4445  194.2986   jump 
+   25  JUMP W L        0.000        68   19.5037  115.1940   jump 
+   26  JUMP W R        0.000        68   25.4740  219.7218   jump 
+   27  JUMP DASH       0.045        68   12.4294   59.1546   dash jump 
+   28  JUMP DASH L     0.000        68   12.8809   66.0525   dash jump 
+   29  JUMP DASH R     0.000        68   11.0064   61.3588   dash jump 
+   30  SLIDE           0.000        68   12.2208   86.1129   slide 
+
+lifetime action usage:
+  total decisions: 10812384
+  action table:
+    idx  action          count    pct    yaw    pitch   flags
+    -------------------------------------------------------------
+      0  GOAL         1122322   10.4%     0.0      0.0   move
+      1  TIGHT L      1867543   17.3%   -18.0      0.0   move
+      2  TIGHT R      1575063   14.6%    18.0      0.0   move
+      3  ARC L         913748    8.5%   -35.0      0.0   move
+      4  ARC R         791901    7.3%    35.0      0.0   move
+      5  WIDE L        909699    8.4%   -75.0      0.0   move
+      6  WIDE R        506755    4.7%    75.0      0.0   move
+      7  CUT L        1038879    9.6%  -115.0      0.0   move
+      8  CUT R         311490    2.9%   115.0      0.0   move
+      9  DASH           37413    0.3%     0.0      0.0   dash 
+     10  DASH UP        55648    0.5%     0.0    -22.0   dash 
+     11  DASH DOWN       3397    0.0%     0.0     18.0   dash 
+     12  DASH UP L      48793    0.5%   -35.0    -22.0   dash 
+     13  DASH UP R     219362    2.0%    35.0    -22.0   dash 
+     14  DASH LOW L      8490    0.1%   -35.0     16.0   dash 
+     15  DASH LOW R      2553    0.0%    35.0     16.0   dash 
+     16  DASH T L        2870    0.0%   -18.0      0.0   dash 
+     17  DASH T R        3075    0.0%    18.0      0.0   dash 
+     18  DASH L          2117    0.0%   -35.0      0.0   dash 
+     19  DASH R          3667    0.0%    35.0      0.0   dash 
+     20  DASH W L        3767    0.0%   -75.0    -16.0   dash 
+     21  DASH W R      133448    1.2%    75.0    -16.0   dash 
+     22  JUMP            7951    0.1%     0.0    -12.0   jump 
+     23  JUMP L        298885    2.8%   -35.0    -10.0   jump 
+     24  JUMP R        251185    2.3%    35.0    -10.0   jump 
+     25  JUMP W L       91685    0.8%   -75.0    -10.0   jump 
+     26  JUMP W R      595185    5.5%    75.0    -10.0   jump 
+     27  JUMP DASH        463    0.0%     0.0    -18.0   dash jump 
+     28  JUMP DASH L      607    0.0%   -35.0    -18.0   dash jump 
+     29  JUMP DASH R      773    0.0%    35.0    -18.0   dash jump 
+     30  SLIDE           3650    0.0%     0.0      8.0   slide 
+
+recent action usage:
+  total decisions: 9038
+  action table:
+    idx  action          count    pct    yaw    pitch   flags
+    -------------------------------------------------------------
+      0  GOAL             567    6.3%     0.0      0.0   move
+      1  TIGHT L         1493   16.5%   -18.0      0.0   move
+      2  TIGHT R         1347   14.9%    18.0      0.0   move
+      3  ARC L            809    9.0%   -35.0      0.0   move
+      4  ARC R            438    4.8%    35.0      0.0   move
+      5  WIDE L          1580   17.5%   -75.0      0.0   move
+      6  WIDE R           688    7.6%    75.0      0.0   move
+      7  CUT L            310    3.4%  -115.0      0.0   move
+      8  CUT R            229    2.5%   115.0      0.0   move
+      9  DASH               6    0.1%     0.0      0.0   dash 
+     10  DASH UP           58    0.6%     0.0    -22.0   dash 
+     11  DASH DOWN          3    0.0%     0.0     18.0   dash 
+     12  DASH UP L         44    0.5%   -35.0    -22.0   dash 
+     13  DASH UP R        252    2.8%    35.0    -22.0   dash 
+     14  DASH LOW L         4    0.0%   -35.0     16.0   dash 
+     15  DASH LOW R         0    0.0%    35.0     16.0   dash 
+     16  DASH T L           0    0.0%   -18.0      0.0   dash 
+     17  DASH T R           1    0.0%    18.0      0.0   dash 
+     18  DASH L             0    0.0%   -35.0      0.0   dash 
+     19  DASH R            13    0.1%    35.0      0.0   dash 
+     20  DASH W L           5    0.1%   -75.0    -16.0   dash 
+     21  DASH W R         113    1.3%    75.0    -16.0   dash 
+     22  JUMP              23    0.3%     0.0    -12.0   jump 
+     23  JUMP L           351    3.9%   -35.0    -10.0   jump 
+     24  JUMP R            77    0.9%    35.0    -10.0   jump 
+     25  JUMP W L          16    0.2%   -75.0    -10.0   jump 
+     26  JUMP W R         611    6.8%    75.0    -10.0   jump 
+     27  JUMP DASH          0    0.0%     0.0    -18.0   dash jump 
+     28  JUMP DASH L        0    0.0%   -35.0    -18.0   dash jump 
+     29  JUMP DASH R        0    0.0%    35.0    -18.0   dash jump 
+     30  SLIDE              0    0.0%     0.0      8.0   slide 
+
+  recent episode log (last 160 stored episodes):
+    ep      outcome   time    reward    dist    walls   coll    decisions   top action
+    ----------------------------------------------------------------------------------
+     94838  STUCK     11.28   -379.95    7.25     28   35.13        113   WIDE L
+     94839  TIMEOUT   14.02   -555.51    6.02     36   68.64        140   TIGHT R
+     94840  SUCCESS   10.00    141.64    3.22     27   38.83        100   TIGHT L
+     94841  STUCK     11.15   -539.24    4.08     29   66.08        112   TIGHT R
+     94842  SUCCESS    7.57    348.85    3.18     11   23.77         76   TIGHT L
+     94843  STUCK     11.30   -340.48   12.84     13   30.78        113   WIDE L
+     94844  SUCCESS   12.53   -497.72    3.20     59  106.60        126   TIGHT L
+     94845  TIMEOUT   14.02   -752.75    8.21     48  110.44        140   WIDE L
+     94846  TIMEOUT   14.02   -309.18    6.55     18   22.23        140   WIDE L
+     94847  SUCCESS   11.82   -199.60    3.16     43   75.61        118   WIDE L
+     94848  SUCCESS   11.20   -123.08    3.22     33   67.81        112   TIGHT L
+     94849  SUCCESS   11.10   -175.08    3.09     34   74.86        111   WIDE L
+     94850  SUCCESS   13.08    -63.56    3.01     29   54.29        131   TIGHT L
+     94851  TIMEOUT   14.02   -828.07    7.02     46  123.10        140   TIGHT L
+     94852  STUCK     10.28   -281.58    6.33     14   23.56        103   TIGHT L
+     94853  TIMEOUT   14.02   -828.86    5.45     70  112.17        140   ARC L
+     94854  SUCCESS   10.63   -666.80    3.04     65  128.96        107   TIGHT R
+     94855  STUCK     13.17   -507.69    6.20     37   43.90        132   WIDE L
+     94856  SUCCESS   13.25   -885.76    3.18     80  149.29        133   TIGHT L
+     94857  STUCK      4.53   -594.79   76.91     27   51.59         46   TIGHT R
+     94858  TIMEOUT   14.02   -664.70   10.60     44   86.86        140   TIGHT L
+     94859  SUCCESS    9.67   -324.23    3.14     63   88.08         97   TIGHT L
+     94860  STUCK     12.18   -376.50    5.96     28   28.03        122   TIGHT R
+     94861  STUCK     10.28   -482.62    6.89     25   65.47        103   WIDE L
+     94862  SUCCESS   10.68    108.11    3.08     27   45.06        107   TIGHT L
+     94863  STUCK     11.87   -636.53    7.09     46   77.88        119   WIDE L
+     94864  SUCCESS    9.77     45.30    3.01     35   36.25         98   TIGHT L
+     94865  STUCK     13.45   -280.51    5.57     14   15.10        135   WIDE L
+     94866  SUCCESS   11.90    234.67    3.12     16   23.43        119   WIDE L
+     94867  SUCCESS    6.82    362.17    3.22     12   23.58         68   TIGHT L
+     94868  SUCCESS   10.75     55.80    3.04     30   46.74        108   WIDE L
+     94869  SUCCESS    9.10    193.80    3.23     23   36.93         91   TIGHT L
+     94870  SUCCESS    8.85    285.51    3.11     13   28.61         89   TIGHT L
+     94871  STUCK     12.63   -646.71    5.28     43   78.39        127   TIGHT R
+     94872  SUCCESS    7.65    437.48    2.98      7   12.58         77   TIGHT L
+     94873  STUCK     11.43   -820.85    5.15     52  111.46        115   WIDE L
+     94874  SUCCESS   11.52     13.19    3.10     25   49.86        115   TIGHT L
+     94875  SUCCESS   12.08      0.09    3.04     36   50.22        121   TIGHT R
+     94876  SUCCESS    8.97    133.45    3.10     21   44.87         90   TIGHT L
+     94877  TIMEOUT   14.02   -629.46    4.77     53   75.88        140   WIDE L
+     94878  STUCK     11.47   -599.29    5.36     33   78.62        115   TIGHT R
+     94879  TIMEOUT   14.02   -525.72    5.74     37   55.37        140   WIDE L
+     94880  SUCCESS   10.30     49.50    3.06     33   41.57        103   TIGHT L
+     94881  TIMEOUT   14.02   -708.37    5.69     54   97.83        140   TIGHT L
+     94882  TIMEOUT   14.02   -584.85    4.09     40   80.55        140   TIGHT L
+     94883  TIMEOUT   14.02  -1073.27    5.56     63  166.36        140   WIDE L
+     94884  SUCCESS   11.30   -172.65    3.11     36   73.00        113   WIDE L
+     94885  SUCCESS   11.15   -349.14    2.99     35   99.87        112   TIGHT L
+     94886  SUCCESS    8.98     23.33    3.15     34   54.41         90   TIGHT L
+     94887  SUCCESS    9.47   -714.51    3.12     56  145.56         95   TIGHT L
+     94888  STUCK     13.10   -599.23    5.80     37   80.19        131   TIGHT L
+     94889  SUCCESS    9.42    293.28    3.20     13   25.78         94   WIDE L
+     94890  TIMEOUT   14.02   -903.80    5.68     66  123.67        140   TIGHT L
+     94891  SUCCESS    8.77    318.24    3.23     12   22.16         88   TIGHT L
+     94892  TIMEOUT   14.02   -365.52    3.86     23   39.22        140   WIDE L
+     94893  SUCCESS   11.77    136.98    3.05     23   36.95        118   TIGHT R
+     94894  SUCCESS   12.28     85.80    3.07     19   39.73        123   WIDE L
+     94895  STUCK     10.98   -346.71    5.61     23   27.29        110   WIDE L
+     94896  SUCCESS   10.32     30.27    3.04     23   52.90        103   TIGHT R
+     94897  SUCCESS    9.60    353.09    3.01     11   18.51         96   TIGHT L
+     94898  SUCCESS   12.93    -83.21    3.21     35   58.98        130   WIDE L
+     94899  STUCK     12.75   -892.12    3.62     75  122.43        128   TIGHT R
+     94900  TIMEOUT   14.02   -557.24    5.26     44   68.04        140   WIDE R
+     94901  TIMEOUT   14.02   -469.70    7.42     30   50.63        140   WIDE L
+     94902  TIMEOUT   14.02   -738.92    6.62     57   94.63        140   TIGHT R
+     94903  STUCK      9.47   -504.17    4.69     31   66.92         95   TIGHT L
+     94904  TIMEOUT   14.02   -338.31    4.14     25   33.26        140   WIDE L
+     94905  SUCCESS   13.58     52.26    3.10     27   44.05        136   WIDE L
+     94906  STUCK     12.32   -295.26    6.07     15   20.11        123   WIDE L
+     94907  SUCCESS    7.95    457.67    3.14     14    9.19         80   TIGHT L
+     94908  STUCK     13.63   -860.88    5.76     63  117.53        137   WIDE L
+     94909  SUCCESS   12.15     60.11    3.17     22   44.02        122   WIDE L
+     94910  SUCCESS   12.42    -23.94    3.07     27   55.77        124   TIGHT L
+     94911  STUCK     11.70   -320.51    3.73     10   26.36        117   TIGHT L
+     94912  SUCCESS   11.50    327.58    3.20     16   14.25        115   WIDE L
+     94913  STUCK      5.22   -463.80   68.55     14   31.95         52   TIGHT R
+     94914  STUCK     11.13   -338.55    5.87     18   31.39        112   TIGHT L
+     94915  SUCCESS   10.73    -80.23    3.22     57   56.78        108   TIGHT R
+     94916  STUCK      9.62   -262.83    3.77     11   20.93         96   TIGHT R
+     94917  SUCCESS    9.80    401.86    3.06      9   12.13         98   TIGHT L
+     94918  STUCK     12.32   -612.02    3.59     39   79.74        123   WIDE L
+     94919  STUCK      9.45   -184.37    5.68      5    4.40         95   WIDE L
+     94920  SUCCESS   11.47   -221.27    3.10     41   81.21        115   TIGHT L
+     94921  SUCCESS   11.05     40.28    3.18     21   52.84        111   WIDE L
+     94922  TIMEOUT   14.02   -723.55    6.77     66   98.73        140   WIDE L
+     94923  STUCK     10.72   -609.09    5.08     49   74.11        107   TIGHT R
+     94924  STUCK     12.08   -269.44    4.24     16   18.71        121   WIDE L
+     94925  TIMEOUT   14.02  -1035.33    6.05     76  149.78        140   ARC L
+     94926  SUCCESS   13.18     -5.90    3.15     27   50.03        132   GOAL
+     94927  SUCCESS    9.70    253.82    3.11     17   29.67         97   TIGHT L
+     94928  SUCCESS   10.03    407.25    3.11     10   11.19        101   WIDE L
+     94929  SUCCESS    9.70    199.25    3.12     21   34.58         97   TIGHT R
+     94930  STUCK     10.12   -666.64    6.23     50   87.31        101   TIGHT R
+     94931  SUCCESS    9.17    126.76    3.04     22   45.99         92   TIGHT L
+     94932  TIMEOUT   14.02   -379.38    7.28     15   35.51        140   WIDE L
+     94933  TIMEOUT   14.02   -519.42    9.99     38   58.72        140   TIGHT L
+     94934  SUCCESS    7.13    511.62    3.10      4    9.02         72   WIDE R
+     94935  SUCCESS    9.55    195.44    3.09     23   34.66         96   TIGHT L
+     94936  SUCCESS   13.72   -153.96    3.25     36   65.67        137   WIDE L
+     94937  SUCCESS   13.28   -213.98    3.24     41   71.21        133   WIDE L
+     94938  SUCCESS   12.65   -296.37    3.21     51   82.78        127   TIGHT L
+     94939  STUCK     12.78   -376.50    4.90     18   40.14        128   TIGHT L
+     94940  STUCK      5.13   -547.88   78.51     19   41.21         52   WIDE L
+     94941  STUCK     11.30   -359.88    3.51     17   33.72        113   WIDE R
+     94942  SUCCESS   12.12     95.37    3.22     24   43.00        121   TIGHT L
+     94943  SUCCESS   10.58   -110.14    3.19     31   70.09        106   TIGHT R
+     94944  STUCK     11.40   -344.97    7.67     20   31.30        114   TIGHT R
+     94945  SUCCESS   10.93    -43.41    2.98     29   63.12        110   TIGHT L
+     94946  SUCCESS    8.00    401.05    3.12     11   16.10         80   TIGHT R
+     94947  STUCK     11.43   -671.11    5.40     40   95.07        115   GOAL
+     94948  SUCCESS    7.88    485.36    3.16      7    9.27         79   TIGHT L
+     94949  STUCK     10.45   -280.52    5.98     17   23.55        105   TIGHT L
+     94950  STUCK      9.87   -317.64    5.94     19   28.93         99   TIGHT R
+     94951  TIMEOUT   14.02   -513.42    5.63     48   61.29        140   ARC L
+     94952  SUCCESS   10.28    242.09    3.10     18   28.41        103   WIDE R
+     94953  SUCCESS    9.22    278.58    3.19     17   27.63         92   WIDE L
+     94954  STUCK     10.77   -470.90    5.67     31   52.54        108   WIDE R
+     94955  TIMEOUT   14.02   -634.32    4.54     40   83.27        140   WIDE L
+     94956  SUCCESS   11.35    144.97    3.19     27   35.61        114   TIGHT L
+     94957  SUCCESS   10.85     77.68    3.06     27   44.78        109   TIGHT L
+     94958  SUCCESS   11.47    405.36    3.13     10    9.17        115   WIDE L
+     94959  STUCK     11.63   -552.33    4.99     45   63.06        117   TIGHT L
+     94960  STUCK     12.38   -333.13    6.94     19   28.46        124   WIDE L
+     94961  STUCK     12.82   -506.42    5.17     38   55.09        128   TIGHT L
+     94962  TIMEOUT   14.02   -267.18    4.39     11   15.13        140   WIDE L
+     94963  SUCCESS   10.97     53.70    3.22     31   40.31        110   TIGHT L
+     94964  STUCK     11.45   -458.08    4.02     32   53.95        115   WIDE L
+     94965  STUCK     10.85   -559.72    4.45     40   64.46        109   TIGHT R
+     94966  SUCCESS   10.88    -20.29    3.15     33   59.12        109   TIGHT L
+     94967  SUCCESS   11.20     74.87    3.05     21   45.84        112   TIGHT L
+     94968  STUCK     13.97   -391.08    7.06     23   32.75        140   TIGHT L
+     94969  SUCCESS    8.75    373.25    3.12     11   17.72         88   WIDE L
+     94970  STUCK     12.18   -820.31    7.48     56  116.73        122   TIGHT R
+     94971  SUCCESS    9.75     71.88    3.17     27   49.05         98   TIGHT R
+     94972  STUCK     10.08   -433.14    6.62     24   46.35        101   TIGHT L
+     94973  STUCK     12.77   -543.66    4.91     36   60.24        128   WIDE L
+     94974  TIMEOUT   14.02   -559.53    8.56     33   68.38        140   CUT R
+     94975  STUCK     11.95   -264.53    8.29     12   17.22        120   WIDE L
+     94976  STUCK     13.87   -495.41    5.31     35   55.78        139   WIDE L
+     94977  TIMEOUT   14.02   -952.80    6.31     67  144.52        140   TIGHT L
+     94978  SUCCESS   10.50    -70.01    3.21     36   61.18        105   TIGHT R
+     94979  SUCCESS   12.20    -12.25    3.24     33   51.44        122   TIGHT L
+     94980  SUCCESS   13.08   -351.62    3.06     45   83.78        131   WIDE L
+     94981  SUCCESS   10.35    -47.30    3.16     35   61.09        104   TIGHT R
+     94982  STUCK     10.08   -286.00    5.42     21   20.73        101   TIGHT L
+     94983  STUCK     13.38   -462.89    5.04     27   48.81        134   WIDE L
+     94984  SUCCESS    9.77    -91.93    3.09     47   63.46         98   TIGHT R
+     94985  SUCCESS    9.32    190.14    3.22     19   35.40         93   WIDE L
+     94986  STUCK     10.55   -365.13    5.23     23   32.63        106   TIGHT L
+     94987  SUCCESS   11.83   -180.02    2.97     29   77.41        119   WIDE L
+     94988  SUCCESS   10.95   -102.21    3.07     30   70.17        110   WIDE L
+     94989  SUCCESS    8.53    434.81    3.03      9   11.31         86   TIGHT R
+     94990  SUCCESS    8.10    299.39    3.23     19   24.92         81   TIGHT L
+     94991  SUCCESS   10.15     41.10    3.18     37   46.12        102   WIDE L
+     94992  SUCCESS    8.52    492.37    3.15      7    7.07         85   TIGHT R
+     94993  SUCCESS   10.10    201.93    3.22     26   34.14        101   TIGHT L
+     94994  STUCK     12.07   -579.10    5.36     45   65.60        121   WIDE R
+     94995  TIMEOUT   14.02   -537.21    6.71     30   62.86        140   TIGHT L
+     94996  TIMEOUT   14.02   -463.51    9.79     26   50.06        140   WIDE L
+     94997  SUCCESS   11.87    144.05    3.12     24   38.07        119   TIGHT R
+
+
+================================================================================
+MODEL 3: Side Route
+================================================================================
+identity:
+  selected: no
+  trainer-ranked best: no
+  reliable selection score: 17327.83
+  color rgba: (135, 60, 190, 255)
+
+lifetime outcomes:
+  episodes started: 86924
+  finished episodes: 86923
+  successes: 21637 (24.9%)
+  timeouts: 27916 (32.1%)
+  stucks: 37370 (43.0%)
+  episodes since best improvement: 514
+  best reward seen: 601.764
+  best success reward: 601.197
+  best success time: 6.483s
+  best replay duration: 6.483s
+  best replay frames/trail: 159 frames, 123 trail points
+
+current live episode:
+  current action: ARC R
+  episode time: 0.850s / 14.000s
+  episode reward: 13.973
+  last step reward: 0.365
+  distance to goal: 92.999m
+  wall hits: 0
+  collision cost: 0.000
+  position: (-0.44, 4.64, 41.00)
+  velocity: (1.50, -8.70, -17.49)
+
+learning parameters:
+  learning rate: 0.055
+  discount: 0.970
+  epsilon/current floor decay: 0.006 / 0.006 / 0.999
+  decision interval: 0.120s
+  turn rate: 360.000 deg/s
+  clearance guidance: 0.180
+  raw feature count: 33
+  encoded feature count: 67
+  replay memory: 24000 / 24000
+  elite memory: 4000 / 4000
+  manual guidance: 5 replays, 3990 samples
+  best-run anchor: 54 samples, 298744 rehearsed updates
+  best-path reward: current episode 1.027, lifetime 212253.219, last step 0.019
+  best policy saved: yes
+  last TD error: -2.226
+
+recent 80 episode aggregate:
+  successes: 22 (27.5%)
+  timeouts: 18 (22.5%)
+  stucks: 40 (50.0%)
+  average reward: -466.058
+  average episode time: 12.294s
+  average successful time: 11.664s
+  best recent success time: 9.483s
+  average distance remaining: 7.642m
+  average wall hits: 41.263
+  average collision cost: 69.491
+  average decisions: 102.750
+
+  readout and recommendations:
+    - Best run is much faster than average recent successes. Treat the best replay as a rare peak, not the model's normal performance.
+    - Stuck rate is high. Penalize low speed/no-progress harder after wall contact and consider reducing dash-heavy action bias for this model.
+    - Wall contact is expensive for learning quality. RL treats wallruns as a fallback except for productive final-cube climbs; keep rewarding clear forward progress and down-rank dash actions when clearance is low.
+    - Replay memory is near capacity. If training lags, lower memory capacity or replay batch counts before adding more actions/features.
+    - Program is CPU-budget limited at this speed setting. The label is not real sim speed; use actual speed, solo mode, and fewer active runners when benchmarking.
+    - Model has gone many episodes without improving. Increase elite replay/blend frequency or briefly raise epsilon to escape the local policy.
+
+learned action parameter snapshot:
+  idx  action           bias     weights   avg |w|   max |w|   last flag
+  -----------------------------------------------------------------------
+    0  GOAL            0.000        68   16.6063   81.0405   move
+    1  TIGHT L         0.000        68   21.8131  140.6242   move
+    2  TIGHT R         0.000        68   22.2430  111.3193   move
+    3  ARC L           0.070        68   17.1680  101.8003   move
+    4  ARC R           0.070        68   14.2208   86.1341   move
+    5  WIDE L          0.120        68   15.8498   87.6372   move
+    6  WIDE R          0.120        68   18.4857  112.4279   move
+    7  CUT L           0.080        68   19.7145  163.2366   move
+    8  CUT R           0.080        68   20.2958  104.8281   move
+    9  DASH            0.000        68   10.4578   38.5514   dash 
+   10  DASH UP         0.000        68   14.1188   59.1593   dash 
+   11  DASH DOWN       0.000        68   14.5268   57.7477   dash 
+   12  DASH UP L       0.000        68   12.4264   52.3350   dash 
+   13  DASH UP R       0.000        68   13.0141   65.2035   dash 
+   14  DASH LOW L      0.000        68   16.1863   78.7663   dash 
+   15  DASH LOW R      0.000        68   10.6817   40.3925   dash 
+   16  DASH T L        0.000        68    9.7892   36.7949   dash 
+   17  DASH T R        0.000        68   10.3946   34.5126   dash 
+   18  DASH L          0.000        68    9.5655   34.6006   dash 
+   19  DASH R          0.000        68   11.0608   42.1993   dash 
+   20  DASH W L        0.000        68   11.3086   54.3010   dash 
+   21  DASH W R        0.000        68   15.4248  115.0269   dash 
+   22  JUMP            0.000        68   12.1462   54.0479   jump 
+   23  JUMP L          0.000        68   17.6145   90.6635   jump 
+   24  JUMP R          0.000        68   19.9833  105.2921   jump 
+   25  JUMP W L        0.000        68   10.1257   39.7520   jump 
+   26  JUMP W R        0.000        68   10.7162   41.1818   jump 
+   27  JUMP DASH       0.000        68   13.0548   51.0888   dash jump 
+   28  JUMP DASH L     0.000        68    8.0273   26.8926   dash jump 
+   29  JUMP DASH R     0.000        68    8.3612   29.6294   dash jump 
+   30  SLIDE           0.000        68   11.8831   51.1937   slide 
+
+lifetime action usage:
+  total decisions: 9025762
+  action table:
+    idx  action          count    pct    yaw    pitch   flags
+    -------------------------------------------------------------
+      0  GOAL          328389    3.6%     0.0      0.0   move
+      1  TIGHT L      2557054   28.3%   -18.0      0.0   move
+      2  TIGHT R       618361    6.9%    18.0      0.0   move
+      3  ARC L        1031813   11.4%   -35.0      0.0   move
+      4  ARC R         264809    2.9%    35.0      0.0   move
+      5  WIDE L        281422    3.1%   -75.0      0.0   move
+      6  WIDE R        361659    4.0%    75.0      0.0   move
+      7  CUT L        1312157   14.5%  -115.0      0.0   move
+      8  CUT R         802981    8.9%   115.0      0.0   move
+      9  DASH            3318    0.0%     0.0      0.0   dash 
+     10  DASH UP        35449    0.4%     0.0    -22.0   dash 
+     11  DASH DOWN      74583    0.8%     0.0     18.0   dash 
+     12  DASH UP L       6197    0.1%   -35.0    -22.0   dash 
+     13  DASH UP R      18158    0.2%    35.0    -22.0   dash 
+     14  DASH LOW L     78037    0.9%   -35.0     16.0   dash 
+     15  DASH LOW R      2330    0.0%    35.0     16.0   dash 
+     16  DASH T L        2875    0.0%   -18.0      0.0   dash 
+     17  DASH T R        3060    0.0%    18.0      0.0   dash 
+     18  DASH L          2316    0.0%   -35.0      0.0   dash 
+     19  DASH R          2696    0.0%    35.0      0.0   dash 
+     20  DASH W L        9224    0.1%   -75.0    -16.0   dash 
+     21  DASH W R       88528    1.0%    75.0    -16.0   dash 
+     22  JUMP            6829    0.1%     0.0    -12.0   jump 
+     23  JUMP L        461288    5.1%   -35.0    -10.0   jump 
+     24  JUMP R        650545    7.2%    35.0    -10.0   jump 
+     25  JUMP W L        4171    0.0%   -75.0    -10.0   jump 
+     26  JUMP W R        4254    0.0%    75.0    -10.0   jump 
+     27  JUMP DASH       7586    0.1%     0.0    -18.0   dash jump 
+     28  JUMP DASH L      804    0.0%   -35.0    -18.0   dash jump 
+     29  JUMP DASH R     1195    0.0%    35.0    -18.0   dash jump 
+     30  SLIDE           3674    0.0%     0.0      8.0   slide 
+
+recent action usage:
+  total decisions: 8220
+  action table:
+    idx  action          count    pct    yaw    pitch   flags
+    -------------------------------------------------------------
+      0  GOAL             138    1.7%     0.0      0.0   move
+      1  TIGHT L         2523   30.7%   -18.0      0.0   move
+      2  TIGHT R          261    3.2%    18.0      0.0   move
+      3  ARC L            910   11.1%   -35.0      0.0   move
+      4  ARC R            546    6.6%    35.0      0.0   move
+      5  WIDE L           332    4.0%   -75.0      0.0   move
+      6  WIDE R           589    7.2%    75.0      0.0   move
+      7  CUT L           1528   18.6%  -115.0      0.0   move
+      8  CUT R            193    2.3%   115.0      0.0   move
+      9  DASH               3    0.0%     0.0      0.0   dash 
+     10  DASH UP            3    0.0%     0.0    -22.0   dash 
+     11  DASH DOWN         46    0.6%     0.0     18.0   dash 
+     12  DASH UP L         26    0.3%   -35.0    -22.0   dash 
+     13  DASH UP R          2    0.0%    35.0    -22.0   dash 
+     14  DASH LOW L        33    0.4%   -35.0     16.0   dash 
+     15  DASH LOW R         0    0.0%    35.0     16.0   dash 
+     16  DASH T L           1    0.0%   -18.0      0.0   dash 
+     17  DASH T R           0    0.0%    18.0      0.0   dash 
+     18  DASH L             0    0.0%   -35.0      0.0   dash 
+     19  DASH R             2    0.0%    35.0      0.0   dash 
+     20  DASH W L           9    0.1%   -75.0    -16.0   dash 
+     21  DASH W R          82    1.0%    75.0    -16.0   dash 
+     22  JUMP               2    0.0%     0.0    -12.0   jump 
+     23  JUMP L           396    4.8%   -35.0    -10.0   jump 
+     24  JUMP R           589    7.2%    35.0    -10.0   jump 
+     25  JUMP W L           1    0.0%   -75.0    -10.0   jump 
+     26  JUMP W R           0    0.0%    75.0    -10.0   jump 
+     27  JUMP DASH          0    0.0%     0.0    -18.0   dash jump 
+     28  JUMP DASH L        1    0.0%   -35.0    -18.0   dash jump 
+     29  JUMP DASH R        1    0.0%    35.0    -18.0   dash jump 
+     30  SLIDE              3    0.0%     0.0      8.0   slide 
+
+  recent episode log (last 160 stored episodes):
+    ep      outcome   time    reward    dist    walls   coll    decisions   top action
+    ----------------------------------------------------------------------------------
+     86764  TIMEOUT   14.02   -792.81    4.97     61  111.21        117   CUT L
+     86765  TIMEOUT   14.02   -629.98   10.05     49   66.68        117   TIGHT L
+     86766  TIMEOUT   14.02   -892.83    5.27     88  127.69        117   TIGHT L
+     86767  SUCCESS   12.58   -280.76    3.12     47   84.06        105   TIGHT L
+     86768  STUCK     11.68   -495.80   11.55     26   58.27         98   TIGHT L
+     86769  TIMEOUT   14.02   -930.53    3.94     67  141.16        117   TIGHT L
+     86770  STUCK     13.70   -617.64   11.41     43   67.23        115   TIGHT L
+     86771  TIMEOUT   14.02   -294.36   12.96     11   14.32        117   TIGHT L
+     86772  SUCCESS   11.87  -1304.00    3.08    103  202.28         99   TIGHT L
+     86773  STUCK     11.63   -385.79    7.48     22   40.32         97   TIGHT L
+     86774  TIMEOUT   14.02   -578.82   14.75     41   61.68        117   TIGHT L
+     86775  TIMEOUT   14.02   -420.23   14.76     22   39.46        117   TIGHT L
+     86776  STUCK     10.93   -285.08   10.27     26   16.41         91   TIGHT L
+     86777  STUCK     13.80  -1128.73    7.39     75  164.06        115   TIGHT L
+     86778  SUCCESS   12.87   -221.88    3.18     53   68.70        108   TIGHT L
+     86779  STUCK      9.68   -604.12   10.20     70   64.33         81   TIGHT L
+     86780  STUCK     10.98   -315.28    5.16     19   24.73         92   TIGHT R
+     86781  STUCK     10.57   -570.71   10.36     38   66.09         88   TIGHT L
+     86782  TIMEOUT   14.02   -917.26   11.43     65  125.29        117   TIGHT L
+     86783  TIMEOUT   14.02   -417.87    4.72     41   45.56        117   TIGHT L
+     86784  SUCCESS   12.70   -676.99    3.21     65  128.09        106   TIGHT L
+     86785  TIMEOUT   14.02  -1148.92   12.26     67  181.24        117   TIGHT L
+     86786  STUCK     11.90   -530.62    5.09     25   70.88        100   TIGHT L
+     86787  STUCK     11.03   -367.34    9.60     24   30.87         92   ARC L
+     86788  STUCK     11.73   -491.12    3.77     32   49.36         98   TIGHT L
+     86789  STUCK     10.00   -253.91   12.51     12   12.94         84   TIGHT L
+     86790  STUCK     10.70   -447.63   14.17     36   39.46         90   TIGHT L
+     86791  SUCCESS   11.78    259.44    3.12     15   22.16         99   TIGHT L
+     86792  TIMEOUT   14.02   -505.95    7.25     44   57.84        117   TIGHT L
+     86793  STUCK     11.95   -398.89   12.05     22   37.44        100   TIGHT L
+     86794  STUCK     11.58   -535.40   16.33     28   56.99         97   TIGHT L
+     86795  STUCK     13.32   -655.22   14.80     50   75.17        111   TIGHT L
+     86796  TIMEOUT   14.02   -537.92   12.42     35   53.78        117   TIGHT L
+     86797  STUCK     11.47   -610.42   11.86     54   71.61         96   TIGHT L
+     86798  STUCK     12.32   -537.13   12.02     42   52.81        103   TIGHT L
+     86799  STUCK     13.73   -878.91   12.76     54  119.73        115   TIGHT L
+     86800  SUCCESS   12.03   -202.23    3.03     66   68.24        101   TIGHT L
+     86801  STUCK     10.98   -521.61   14.30     59   54.21         92   TIGHT L
+     86802  STUCK     13.58   -555.69    6.58     57   57.10        114   TIGHT L
+     86803  STUCK     12.98   -402.93   11.18     31   34.22        109   TIGHT L
+     86804  STUCK     13.22  -1181.44    6.02     89  174.31        111   TIGHT L
+     86805  STUCK     12.05   -592.71    4.96     42   69.89        101   TIGHT L
+     86806  TIMEOUT   14.02   -583.19    8.80     35   77.91        117   TIGHT L
+     86807  STUCK     13.77   -628.01    5.02     78   60.94        115   TIGHT L
+     86808  TIMEOUT   14.02   -597.31   13.00     41   67.36        117   TIGHT L
+     86809  TIMEOUT   14.02   -401.54    6.59     23   40.65        117   TIGHT L
+     86810  TIMEOUT   14.02   -550.50    8.23     41   60.15        117   TIGHT L
+     86811  TIMEOUT   14.02   -478.04    4.55     45   52.13        117   TIGHT L
+     86812  TIMEOUT   14.02   -910.01    5.82     64  131.49        117   TIGHT L
+     86813  TIMEOUT   14.02   -606.33   10.37     43   71.32        117   TIGHT L
+     86814  STUCK     10.70   -322.84   12.90     20   26.19         90   TIGHT L
+     86815  SUCCESS   11.78   -491.14    3.18     58  108.86         99   TIGHT L
+     86816  STUCK     13.45   -715.44   10.89     62   87.63        112   CUT L
+     86817  TIMEOUT   14.02   -183.55    5.83     10    7.72        117   CUT L
+     86818  STUCK     12.13   -801.87   14.47     60  102.86        101   TIGHT L
+     86819  TIMEOUT   14.02   -665.70   13.06     41   83.55        117   TIGHT L
+     86820  STUCK     11.33   -799.25   10.70     61  110.71         95   TIGHT L
+     86821  SUCCESS   11.32   -291.75    3.23     49   82.59         95   TIGHT L
+     86822  TIMEOUT   14.02   -525.71    6.96     38   62.56        117   TIGHT L
+     86823  STUCK     11.43   -274.96    5.96     11   19.25         96   TIGHT L
+     86824  TIMEOUT   14.02   -782.36    6.36     56  115.70        117   TIGHT L
+     86825  TIMEOUT   14.02   -787.24    8.69     82  101.75        117   TIGHT L
+     86826  SUCCESS    7.95    515.09    3.20      6    6.59         67   TIGHT L
+     86827  STUCK     10.83   -561.59   12.14     30   68.41         91   TIGHT L
+     86828  SUCCESS   10.00     41.10    3.16     37   45.41         84   TIGHT L
+     86829  STUCK     12.57   -764.36    8.20     62   95.86        105   TIGHT L
+     86830  STUCK     13.68  -1142.08   10.53     68  171.19        114   TIGHT L
+     86831  SUCCESS   13.00   -579.02    3.21     56  115.79        109   TIGHT L
+     86832  STUCK     10.25   -276.92    9.81     17   21.86         86   TIGHT L
+     86833  STUCK     10.02   -489.94   11.82     51   44.14         84   TIGHT L
+     86834  SUCCESS   10.97     55.80    3.25     30   38.85         92   TIGHT L
+     86835  STUCK     12.22   -604.24   14.41     36   70.29        102   TIGHT L
+     86836  STUCK     13.05   -498.06   11.14     28   57.44        109   TIGHT L
+     86837  TIMEOUT   14.02  -1444.36   10.56    127  227.39        117   CUT L
+     86838  STUCK     12.75   -422.18   11.31     33   44.48        107   TIGHT L
+     86839  STUCK     13.45   -752.06    6.03     47  111.54        112   TIGHT L
+     86840  SUCCESS    9.65    152.04    3.21     19   41.55         81   TIGHT L
+     86841  STUCK     11.20   -272.97   12.81     13   16.15         94   TIGHT L
+     86842  STUCK     13.65   -741.14   11.28     44   96.92        114   TIGHT L
+     86843  TIMEOUT   14.02   -463.99    3.61     49   48.73        117   TIGHT L
+     86844  TIMEOUT   14.02   -987.59    6.44     74  148.89        117   TIGHT L
+     86845  STUCK     11.95   -463.40   11.64     37   45.28        100   TIGHT L
+     86846  STUCK     10.22   -652.11    6.22     46   93.01         86   TIGHT L
+     86847  STUCK     12.52   -898.03   11.97     59  122.45        105   TIGHT L
+     86848  STUCK     11.68   -353.38   11.65     16   29.48         98   ARC L
+     86849  SUCCESS   14.00   -556.13    3.22     57  109.08        117   TIGHT L
+     86850  TIMEOUT   14.02   -620.28   11.66     56   73.94        117   CUT L
+     86851  TIMEOUT   14.02   -774.78    9.24     47  111.12        117   TIGHT L
+     86852  STUCK     11.53   -715.46   13.42     75   81.35         96   TIGHT L
+     86853  STUCK     12.25   -572.05    6.24     42   69.60        102   TIGHT L
+     86854  STUCK     13.03   -530.68   12.47     31   61.12        109   TIGHT L
+     86855  STUCK     13.52   -518.60   12.14     26   60.55        113   TIGHT L
+     86856  STUCK     12.30   -735.37   11.47     56   90.61        103   TIGHT L
+     86857  STUCK     12.27   -467.84   13.94     27   44.48        103   TIGHT L
+     86858  SUCCESS   11.02     80.85    3.18     27   44.84         92   TIGHT L
+     86859  STUCK     12.37   -831.74    4.39     55  119.98        103   TIGHT L
+     86860  STUCK     12.80   -766.75   10.96     67   92.60        107   ARC L
+     86861  TIMEOUT   14.02   -497.72   11.21     51   41.72        117   CUT L
+     86862  STUCK     11.05   -466.47   11.22     33   48.09         92   TIGHT L
+     86863  SUCCESS   13.33  -1765.62    3.12     87  263.84        111   TIGHT L
+     86864  SUCCESS   12.40     49.50    3.21     33   29.37        104   TIGHT L
+     86865  TIMEOUT   14.02   -723.85   10.80     67   88.89        117   TIGHT L
+     86866  TIMEOUT   14.02   -512.93    8.36     41   57.69        117   TIGHT L
+     86867  SUCCESS   11.75   -171.64    3.06     51   70.49         98   TIGHT L
+     86868  SUCCESS   12.35   -213.37    3.12     54   73.44        103   TIGHT L
+     86869  STUCK     10.68   -531.57   12.75     29   60.14         89   TIGHT L
+     86870  STUCK     11.53   -490.99   10.94     26   58.39         96   TIGHT L
+     86871  STUCK      9.52   -601.43   11.56     57   69.27         80   TIGHT L
+     86872  STUCK     11.12   -500.01    6.85     25   55.65         93   TIGHT L
+     86873  STUCK     11.73   -380.18   11.83     23   32.75         98   TIGHT L
+     86874  STUCK     12.55   -409.26   13.14     24   34.83        105   TIGHT L
+     86875  TIMEOUT   14.02   -688.02    7.61     45  100.30        117   TIGHT L
+     86876  TIMEOUT   14.02   -738.01    4.11     52  102.05        117   TIGHT L
+     86877  TIMEOUT   14.02   -568.50    4.22     44   76.95        117   TIGHT L
+     86878  STUCK     12.50   -771.79   11.94     70   95.39        105   TIGHT L
+     86879  STUCK     11.05   -541.43    4.87     35   65.72         92   TIGHT L
+     86880  STUCK     11.10   -514.71    8.76     51   56.89         93   TIGHT L
+     86881  SUCCESS   13.25   -146.32    3.24     41   62.22        111   TIGHT L
+     86882  SUCCESS   12.65    -81.76    3.02     44   59.04        106   TIGHT L
+     86883  TIMEOUT   14.02   -550.94   11.01     50   61.18        117   TIGHT L
+     86884  SUCCESS   10.05    245.65    3.18     21   24.70         84   TIGHT L
+     86885  STUCK     12.50   -645.42    5.10     46   83.67        105   TIGHT L
+     86886  SUCCESS   12.37   -272.35    3.13     50   76.30        103   TIGHT L
+     86887  SUCCESS   10.22    101.70    3.23     24   49.44         86   TIGHT L
+     86888  SUCCESS   10.03    184.67    3.16     19   36.97         84   TIGHT L
+     86889  TIMEOUT   14.02   -895.38    8.63     72  127.59        117   TIGHT L
+     86890  SUCCESS   12.72     51.60    2.96     32   23.04        106   CUT L
+     86891  STUCK     11.02   -335.97    4.10     18   35.53         92   TIGHT L
+     86892  STUCK     10.67   -268.64    4.89     10   19.12         89   ARC L
+     86893  STUCK     13.48   -610.78    8.13     38   73.27        113   TIGHT L
+     86894  SUCCESS   12.22   -229.17    3.25     44   78.71        102   TIGHT L
+     86895  STUCK     12.55   -328.29   13.97     14   23.18        105   TIGHT L
+     86896  STUCK     12.23   -468.22    9.61     30   50.19        102   TIGHT L
+     86897  TIMEOUT   14.02   -448.96   12.72     19   44.17        117   TIGHT L
+     86898  SUCCESS   12.40     -1.26    3.11     34   49.09        104   CUT L
+     86899  TIMEOUT   14.02   -440.40   12.34     24   54.13        117   TIGHT L
+     86900  SUCCESS   11.07    -72.58    3.16     34   66.86         93   TIGHT L
+     86901  STUCK     13.13   -909.70    5.25     70  122.07        110   TIGHT L
+     86902  TIMEOUT   14.02   -796.00   14.54     56  107.88        117   TIGHT L
+     86903  SUCCESS   11.15   -677.06    3.18     59  133.87         93   TIGHT L
+     86904  STUCK     10.12   -300.39   13.35     17   23.24         85   TIGHT L
+     86905  SUCCESS   10.42   -161.21    3.13     54   69.06         87   ARC L
+     86906  TIMEOUT   14.02   -742.66    9.06     64  102.77        117   TIGHT L
+     86907  STUCK     12.97  -1485.17    4.74     95  226.45        108   TIGHT L
+     86908  STUCK      9.80   -271.28   11.84     11   19.48         82   TIGHT L
+     86909  STUCK     11.05   -388.33   12.87     18   38.03         92   TIGHT L
+     86910  SUCCESS    9.48    -45.23    3.11     49   55.58         79   TIGHT L
+     86911  STUCK     13.63   -486.24    7.13     34   55.19        114   CUT L
+     86912  SUCCESS    9.80    216.19    2.98     25   33.92         82   TIGHT L
+     86913  TIMEOUT   14.02   -584.93   10.10     42   65.90        117   TIGHT L
+     86914  TIMEOUT   14.02   -442.62   14.09     20   32.69        117   TIGHT L
+     86915  SUCCESS   12.45   -196.89    3.03     51   68.61        104   TIGHT L
+     86916  STUCK     13.22   -426.10    5.83     38   40.28        111   TIGHT L
+     86917  STUCK     11.10   -616.05    4.62     44   73.16         93   TIGHT L
+     86918  SUCCESS   11.50     45.32    3.19     28   47.53         96   TIGHT L
+     86919  STUCK     12.48   -514.74   11.64     35   49.06        104   TIGHT L
+     86920  STUCK     12.17   -304.98    8.22     18   22.87        102   CUT L
+     86921  TIMEOUT   14.02   -622.34    5.37     46   80.01        117   TIGHT L
+     86922  STUCK     10.08   -456.93    4.27     39   46.17         84   TIGHT L
+     86923  STUCK     13.10   -503.15    4.89     28   66.87        110   TIGHT L
+
+
+================================================================================
+MODEL 4: Steady
+================================================================================
+identity:
+  selected: yes
+  trainer-ranked best: yes
+  reliable selection score: 54905.98
+  color rgba: (255, 203, 0, 255)
+
+lifetime outcomes:
+  episodes started: 102685
+  finished episodes: 102684
+  successes: 68018 (66.2%)
+  timeouts: 6730 (6.6%)
+  stucks: 27936 (27.2%)
+  episodes since best improvement: 209
+  best reward seen: 621.976
+  best success reward: 620.235
+  best success time: 5.950s
+  best replay duration: 5.950s
+  best replay frames/trail: 143 frames, 116 trail points
+
+current live episode:
+  current action: WIDE L
+  episode time: 8.333s / 14.000s
+  episode reward: -79.407
+  last step reward: -0.472
+  distance to goal: 7.709m
+  wall hits: 31
+  collision cost: 58.885
+  position: (3.80, 2.77, -45.29)
+  velocity: (8.39, -3.30, 6.77)
+
+learning parameters:
+  learning rate: 0.045
+  discount: 0.980
+  epsilon/current floor decay: 0.006 / 0.006 / 0.999
+  decision interval: 0.130s
+  turn rate: 360.000 deg/s
+  clearance guidance: 0.180
+  raw feature count: 33
+  encoded feature count: 67
+  replay memory: 24000 / 24000
+  elite memory: 4000 / 4000
+  manual guidance: 5 replays, 3990 samples
+  best-run anchor: 46 samples, 576634 rehearsed updates
+  best-path reward: current episode 3.930, lifetime 524286.594, last step 0.014
+  best policy saved: yes
+  last TD error: -21.077
+
+recent 80 episode aggregate:
+  successes: 52 (65.0%)
+  timeouts: 5 (6.2%)
+  stucks: 23 (28.8%)
+  average reward: -159.387
+  average episode time: 10.755s
+  average successful time: 10.113s
+  best recent success time: 6.883s
+  average distance remaining: 4.152m
+  average wall hits: 32.125
+  average collision cost: 56.496
+  average decisions: 83.088
+
+  readout and recommendations:
+    - Best run is much faster than average recent successes. Treat the best replay as a rare peak, not the model's normal performance.
+    - Stuck rate is high. Penalize low speed/no-progress harder after wall contact and consider reducing dash-heavy action bias for this model.
+    - Wall contact is expensive for learning quality. RL treats wallruns as a fallback except for productive final-cube climbs; keep rewarding clear forward progress and down-rank dash actions when clearance is low.
+    - Replay memory is near capacity. If training lags, lower memory capacity or replay batch counts before adding more actions/features.
+    - Program is CPU-budget limited at this speed setting. The label is not real sim speed; use actual speed, solo mode, and fewer active runners when benchmarking.
+
+learned action parameter snapshot:
+  idx  action           bias     weights   avg |w|   max |w|   last flag
+  -----------------------------------------------------------------------
+    0  GOAL            0.080        68   40.5978  158.3534   move
+    1  TIGHT L         0.000        68   19.8320  147.0987   move
+    2  TIGHT R         0.000        68   23.2859  144.6827   move
+    3  ARC L           0.000        68   23.7729  157.5675   move
+    4  ARC R           0.000        68   37.1215  224.1618   move
+    5  WIDE L          0.000        68   33.8523  236.8899   move
+    6  WIDE R          0.000        68   20.6091  133.2811   move
+    7  CUT L           0.000        68   20.0887  162.7794   move
+    8  CUT R           0.000        68   22.6194  164.8121   move
+    9  DASH           -0.020        68   16.2455   63.0497   dash 
+   10  DASH UP        -0.040        68   17.7579   87.5318   dash 
+   11  DASH DOWN      -0.020        68   36.1991  166.2238   dash 
+   12  DASH UP L      -0.020        68   23.3113  100.9573   dash 
+   13  DASH UP R      -0.040        68   17.6125  100.2300   dash 
+   14  DASH LOW L     -0.020        68   16.6801   64.6457   dash 
+   15  DASH LOW R     -0.020        68   16.8501   63.4505   dash 
+   16  DASH T L       -0.035        68   16.1565   67.4081   dash 
+   17  DASH T R       -0.035        68   14.8236   51.4998   dash 
+   18  DASH L         -0.020        68   16.7430   64.5382   dash 
+   19  DASH R         -0.040        68   16.5790   59.3679   dash 
+   20  DASH W L       -0.040        68   16.7135   80.8217   dash 
+   21  DASH W R       -0.020        68   23.4481  166.1749   dash 
+   22  JUMP            0.000        68   31.3682  248.6402   jump 
+   23  JUMP L          0.000        68   17.9654   80.6333   jump 
+   24  JUMP R          0.000        68   26.5170  157.5612   jump 
+   25  JUMP W L        0.000        68   17.0835  109.0216   jump 
+   26  JUMP W R        0.000        68   16.9642   75.3376   jump 
+   27  JUMP DASH      -0.040        68   14.0276   48.6359   dash jump 
+   28  JUMP DASH L    -0.020        68   13.6101   47.8258   dash jump 
+   29  JUMP DASH R    -0.040        68   13.4932   47.7845   dash jump 
+   30  SLIDE           0.000        68   17.3145   79.6571   slide 
+
+lifetime action usage:
+  total decisions: 8339710
+  action table:
+    idx  action          count    pct    yaw    pitch   flags
+    -------------------------------------------------------------
+      0  GOAL         1479587   17.7%     0.0      0.0   move
+      1  TIGHT L       150930    1.8%   -18.0      0.0   move
+      2  TIGHT R       424925    5.1%    18.0      0.0   move
+      3  ARC L         184027    2.2%   -35.0      0.0   move
+      4  ARC R        2095195   25.1%    35.0      0.0   move
+      5  WIDE L       1099758   13.2%   -75.0      0.0   move
+      6  WIDE R        454861    5.5%    75.0      0.0   move
+      7  CUT L         348038    4.2%  -115.0      0.0   move
+      8  CUT R         347535    4.2%   115.0      0.0   move
+      9  DASH            1752    0.0%     0.0      0.0   dash 
+     10  DASH UP         3764    0.0%     0.0    -22.0   dash 
+     11  DASH DOWN     329666    4.0%     0.0     18.0   dash 
+     12  DASH UP L      49276    0.6%   -35.0    -22.0   dash 
+     13  DASH UP R       4430    0.1%    35.0    -22.0   dash 
+     14  DASH LOW L      1400    0.0%   -35.0     16.0   dash 
+     15  DASH LOW R      1948    0.0%    35.0     16.0   dash 
+     16  DASH T L        2171    0.0%   -18.0      0.0   dash 
+     17  DASH T R        1029    0.0%    18.0      0.0   dash 
+     18  DASH L          1533    0.0%   -35.0      0.0   dash 
+     19  DASH R          1614    0.0%    35.0      0.0   dash 
+     20  DASH W L        6255    0.1%   -75.0    -16.0   dash 
+     21  DASH W R      150980    1.8%    75.0    -16.0   dash 
+     22  JUMP          751625    9.0%     0.0    -12.0   jump 
+     23  JUMP L         12963    0.2%   -35.0    -10.0   jump 
+     24  JUMP R        419351    5.0%    35.0    -10.0   jump 
+     25  JUMP W L        7292    0.1%   -75.0    -10.0   jump 
+     26  JUMP W R        2008    0.0%    75.0    -10.0   jump 
+     27  JUMP DASH        380    0.0%     0.0    -18.0   dash jump 
+     28  JUMP DASH L      476    0.0%   -35.0    -18.0   dash jump 
+     29  JUMP DASH R      468    0.0%    35.0    -18.0   dash jump 
+     30  SLIDE           4473    0.1%     0.0      8.0   slide 
+
+recent action usage:
+  total decisions: 6647
+  action table:
+    idx  action          count    pct    yaw    pitch   flags
+    -------------------------------------------------------------
+      0  GOAL            1191   17.9%     0.0      0.0   move
+      1  TIGHT L          155    2.3%   -18.0      0.0   move
+      2  TIGHT R          211    3.2%    18.0      0.0   move
+      3  ARC L            184    2.8%   -35.0      0.0   move
+      4  ARC R           1593   24.0%    35.0      0.0   move
+      5  WIDE L           950   14.3%   -75.0      0.0   move
+      6  WIDE R           387    5.8%    75.0      0.0   move
+      7  CUT L            295    4.4%  -115.0      0.0   move
+      8  CUT R            274    4.1%   115.0      0.0   move
+      9  DASH               0    0.0%     0.0      0.0   dash 
+     10  DASH UP            6    0.1%     0.0    -22.0   dash 
+     11  DASH DOWN        252    3.8%     0.0     18.0   dash 
+     12  DASH UP L         34    0.5%   -35.0    -22.0   dash 
+     13  DASH UP R          1    0.0%    35.0    -22.0   dash 
+     14  DASH LOW L         0    0.0%   -35.0     16.0   dash 
+     15  DASH LOW R         3    0.0%    35.0     16.0   dash 
+     16  DASH T L           0    0.0%   -18.0      0.0   dash 
+     17  DASH T R           1    0.0%    18.0      0.0   dash 
+     18  DASH L             0    0.0%   -35.0      0.0   dash 
+     19  DASH R             2    0.0%    35.0      0.0   dash 
+     20  DASH W L           4    0.1%   -75.0    -16.0   dash 
+     21  DASH W R         132    2.0%    75.0    -16.0   dash 
+     22  JUMP             599    9.0%     0.0    -12.0   jump 
+     23  JUMP L             3    0.0%   -35.0    -10.0   jump 
+     24  JUMP R           354    5.3%    35.0    -10.0   jump 
+     25  JUMP W L          11    0.2%   -75.0    -10.0   jump 
+     26  JUMP W R           1    0.0%    75.0    -10.0   jump 
+     27  JUMP DASH          1    0.0%     0.0    -18.0   dash jump 
+     28  JUMP DASH L        3    0.0%   -35.0    -18.0   dash jump 
+     29  JUMP DASH R        0    0.0%    35.0    -18.0   dash jump 
+     30  SLIDE              0    0.0%     0.0      8.0   slide 
+
+  recent episode log (last 160 stored episodes):
+    ep      outcome   time    reward    dist    walls   coll    decisions   top action
+    ----------------------------------------------------------------------------------
+    102525  STUCK     10.62   -328.92    5.19     23   25.80         82   ARC R
+    102526  STUCK      9.98   -399.91    6.50     26   34.70         77   ARC R
+    102527  SUCCESS    7.70    476.27    3.21      7   10.08         60   ARC R
+    102528  SUCCESS   11.92     51.60    3.20     32   33.13         92   ARC R
+    102529  STUCK     11.50   -488.81    8.91     34   51.06         89   GOAL
+    102530  SUCCESS    9.47     55.80    3.20     30   38.65         73   ARC R
+    102531  SUCCESS    7.22    305.81    3.16     18   26.55         56   GOAL
+    102532  SUCCESS    9.87    213.73    3.19     22   30.36         76   GOAL
+    102533  SUCCESS    8.05    304.29    3.06     20   23.57         62   ARC R
+    102534  STUCK     11.98   -395.47    6.34     29   35.66         93   GOAL
+    102535  SUCCESS   10.38    161.96    3.07     27   36.35         80   GOAL
+    102536  SUCCESS    9.68     14.98    3.15     30   55.30         75   GOAL
+    102537  SUCCESS   10.00    262.33    3.25     18   24.19         77   ARC R
+    102538  SUCCESS    8.38    156.26    3.05     21   43.14         65   ARC R
+    102539  SUCCESS    8.12     74.22    3.23     26   52.54         63   GOAL
+    102540  SUCCESS   11.28   -225.22    3.23     32   82.62         87   ARC R
+    102541  STUCK     12.98   -413.15    4.82     23   40.13        100   GOAL
+    102542  SUCCESS   10.25   -290.89    3.25     44   91.64         79   ARC R
+    102543  SUCCESS   11.10     71.57    2.98     23   47.80         86   WIDE L
+    102544  TIMEOUT   14.02   -351.79    6.33     21   29.55        108   ARC R
+    102545  SUCCESS   12.12    150.85    3.07     22   33.42         94   ARC R
+    102546  STUCK      9.83   -353.86    4.93     20   33.66         76   ARC R
+    102547  TIMEOUT   14.02   -530.60    5.35     41   62.96        108   ARC R
+    102548  SUCCESS   12.50    299.76    3.12     11   18.64         97   WIDE L
+    102549  SUCCESS   10.77    -59.24    2.92     27   65.68         83   GOAL
+    102550  SUCCESS    8.68    -83.42    3.16     33   70.63         67   ARC R
+    102551  STUCK     12.92   -430.70    7.48     31   42.04        100   ARC R
+    102552  SUCCESS   13.13    305.98    3.09     10   13.80        101   ARC R
+    102553  STUCK     10.32   -295.46    4.79     17   21.35         80   GOAL
+    102554  SUCCESS    7.80    249.93    3.24     18   35.79         60   ARC R
+    102555  SUCCESS    8.90     51.60    2.96     32   35.01         69   ARC R
+    102556  SUCCESS   10.13    312.63    2.94     16   17.67         78   ARC R
+    102557  SUCCESS    8.78    322.61    3.06     13   22.82         68   GOAL
+    102558  SUCCESS    8.38    -17.84    3.12     34   63.78         65   ARC R
+    102559  SUCCESS    7.90    425.64    2.99     12   13.09         61   ARC R
+    102560  SUCCESS    9.05    393.11    3.14     14   12.22         70   ARC R
+    102561  STUCK     10.27   -398.16    5.76     25   38.24         79   ARC R
+    102562  STUCK     10.87   -477.29    5.41     39   47.16         84   GOAL
+    102563  STUCK      9.95   -425.02    5.88     31   46.01         77   GOAL
+    102564  SUCCESS   12.28     41.10    3.20     37   40.07         95   ARC R
+    102565  SUCCESS    7.32    166.54    3.23     25   45.06         57   GOAL
+    102566  STUCK     12.95  -1033.53    9.64     56  147.16        100   GOAL
+    102567  SUCCESS    8.95    211.73    3.19     27   31.86         69   GOAL
+    102568  STUCK      9.77   -503.28    6.42     30   60.78         76   GOAL
+    102569  STUCK     11.55   -391.80    9.42     25   31.88         89   GOAL
+    102570  STUCK     11.33   -335.52    7.54     14   28.79         88   ARC R
+    102571  SUCCESS    9.73    223.55    3.24     21   31.42         75   GOAL
+    102572  STUCK      9.43   -364.50    8.72     23   33.68         73   ARC R
+    102573  SUCCESS   10.42   -137.73    3.06     43   70.54         81   GOAL
+    102574  SUCCESS   11.88    -13.02    3.10     27   57.00         92   ARC R
+    102575  STUCK     13.23   -485.77    6.08     37   47.08        102   ARC R
+    102576  SUCCESS    7.53    409.40    3.23     17   12.76         58   ARC R
+    102577  TIMEOUT   14.02   -715.88    6.10     49   95.98        108   ARC R
+    102578  TIMEOUT   14.02  -1040.90    5.57     83  161.02        108   ARC R
+    102579  TIMEOUT   14.02   -829.63    5.44     62  118.92        108   GOAL
+    102580  SUCCESS    7.65    297.81    3.12     20   27.82         59   GOAL
+    102581  SUCCESS    7.50    554.49    3.14      4    4.29         58   ARC R
+    102582  STUCK     10.63   -534.92    5.67     35   69.10         82   ARC R
+    102583  SUCCESS    8.57     22.03    3.21     33   55.25         66   ARC R
+    102584  SUCCESS    9.43     41.10    3.12     37   49.98         73   GOAL
+    102585  SUCCESS   12.33     32.75    3.23     26   46.79         95   ARC R
+    102586  STUCK     12.63   -608.68    6.13     51   68.30         98   ARC R
+    102587  STUCK     13.17   -735.91    8.49     62   92.52        102   GOAL
+    102588  SUCCESS    7.38     39.08    3.05     22   61.95         57   ARC R
+    102589  SUCCESS   10.93    -94.22    3.15     39   66.04         84   ARC R
+    102590  SUCCESS   10.03     98.98    3.12     24   46.84         78   ARC R
+    102591  SUCCESS    9.53    342.88    3.05     14   17.96         74   ARC R
+    102592  SUCCESS    9.57    269.94    3.22     15   27.59         74   ARC R
+    102593  SUCCESS   11.10   -564.90    3.00     51  122.79         86   ARC R
+    102594  SUCCESS    9.15    429.82    3.14     11    9.16         71   ARC R
+    102595  SUCCESS   10.27     36.34    3.16     28   52.18         79   ARC R
+    102596  SUCCESS    6.28    326.49    2.93     22   24.04         49   ARC R
+    102597  STUCK     12.60   -461.90    5.38     41   47.72         97   ARC R
+    102598  SUCCESS    9.15    -66.34    3.11     36   66.91         71   ARC R
+    102599  STUCK     10.57   -496.68    5.32     34   59.78         82   ARC R
+    102600  SUCCESS    7.83     53.70    3.23     31   42.33         61   GOAL
+    102601  SUCCESS   10.10    276.89    3.07     15   27.68         78   ARC R
+    102602  SUCCESS    7.67    323.02    3.03     16   24.13         59   ARC R
+    102603  SUCCESS    9.88    308.07    3.23     23   18.97         76   GOAL
+    102604  SUCCESS   11.53    -37.71    3.01     44   51.69         89   GOAL
+    102605  STUCK      9.60   -287.49    5.73     12   21.18         74   GOAL
+    102606  STUCK      9.02   -304.74    9.32     22   25.58         70   GOAL
+    102607  SUCCESS   10.80     47.40    2.96     34   47.45         83   ARC R
+    102608  SUCCESS    6.88    479.75    3.25      5   11.00         53   ARC R
+    102609  SUCCESS    7.13    339.69    3.22     10   22.97         55   ARC R
+    102610  SUCCESS   10.63    149.43    3.20     23   39.13         82   ARC R
+    102611  SUCCESS    8.95    165.44    3.22     14   40.70         69   ARC R
+    102612  STUCK     12.22   -539.84   11.86     32   59.55         94   WIDE L
+    102613  SUCCESS    9.32    335.32    2.97     15   20.82         72   GOAL
+    102614  SUCCESS   13.62   -354.17    3.13     67   81.92        105   WIDE L
+    102615  SUCCESS    8.62    -92.45    3.15     36   72.36         67   ARC R
+    102616  TIMEOUT   14.02   -816.84   10.13     56  111.18        108   WIDE L
+    102617  SUCCESS   10.05    121.75    3.03     24   39.23         78   ARC R
+    102618  SUCCESS   10.08      3.66    3.08     32   55.27         78   ARC R
+    102619  TIMEOUT   14.02   -874.00    7.60     58  122.24        108   ARC R
+    102620  STUCK     12.12   -431.02    4.70     39   41.33         94   WIDE L
+    102621  SUCCESS   12.48    114.32    3.24     24   37.21         96   ARC R
+    102622  SUCCESS   11.23     18.88    3.03     37   47.82         87   ARC R
+    102623  STUCK     13.77   -777.32    4.45     61  102.86        106   ARC R
+    102624  SUCCESS    8.70    399.28    3.13     14   14.89         67   GOAL
+    102625  SUCCESS   11.00    201.94    3.22     28   28.45         85   ARC R
+    102626  TIMEOUT   14.02   -729.60    4.53     61   91.73        108   ARC R
+    102627  SUCCESS   11.13   -166.13    3.14     49   69.84         86   ARC R
+    102628  STUCK     13.72   -835.69    6.98     56  106.85        106   ARC R
+    102629  SUCCESS    7.53    307.08    3.18     22   22.33         58   ARC R
+    102630  STUCK     13.55   -649.07    4.45     44   78.28        105   ARC R
+    102631  STUCK     12.63   -732.43    4.97     44   97.92         98   ARC R
+    102632  SUCCESS    8.68     59.72    3.00     25   55.18         67   ARC R
+    102633  SUCCESS    8.70    308.26    3.11     20   19.40         67   GOAL
+    102634  STUCK      8.92   -460.55    4.28     42   47.12         69   ARC R
+    102635  SUCCESS    9.10   -146.36    3.13     39   76.18         70   ARC R
+    102636  SUCCESS   10.32     24.56    3.11     27   53.41         80   ARC R
+    102637  SUCCESS   10.53   -150.71    3.03     45   70.27         81   ARC R
+    102638  SUCCESS   11.00   -125.65    3.14     30   70.14         85   ARC R
+    102639  STUCK     10.00   -285.43    4.98     16   21.20         77   GOAL
+    102640  SUCCESS    9.40    356.12    3.21     14   16.59         73   ARC R
+    102641  STUCK     12.00   -529.63    7.19     30   62.35         93   WIDE L
+    102642  SUCCESS    8.30     57.29    3.11     22   56.75         64   GOAL
+    102643  SUCCESS    9.28    212.81    3.11     15   35.17         72   ARC R
+    102644  SUCCESS   10.87   -145.00    3.09     28   75.09         84   GOAL
+    102645  SUCCESS   10.52   -399.58    3.02     41  107.68         81   ARC R
+    102646  SUCCESS   12.30    313.85    3.23     21   14.27         95   ARC R
+    102647  STUCK     10.02   -381.55    6.15     20   35.74         77   ARC R
+    102648  STUCK     11.13   -358.49    5.18     16   34.90         86   WIDE L
+    102649  SUCCESS   12.70   -819.51    3.18     74  142.76         98   ARC R
+    102650  SUCCESS   12.32    122.96    3.17     28   36.96         95   ARC R
+    102651  SUCCESS    8.30    489.70    3.23      9    7.09         64   ARC R
+    102652  SUCCESS   13.70   -296.24    3.21     54   80.38        106   ARC R
+    102653  SUCCESS    9.02    497.99    3.14      5    6.78         70   ARC R
+    102654  SUCCESS    9.80    375.59    3.14     11   15.94         76   ARC R
+    102655  SUCCESS    9.40     -2.36    3.14     30   58.80         73   ARC R
+    102656  STUCK     11.42   -397.12    4.75     28   41.48         88   GOAL
+    102657  STUCK     11.75   -490.45    6.15     26   59.57         91   ARC R
+    102658  SUCCESS   12.78   -210.57    3.06     48   69.27         99   ARC R
+    102659  SUCCESS   10.10    -92.68    3.17     32   68.80         78   ARC R
+    102660  SUCCESS   10.18    276.60    3.15     24   24.39         79   ARC R
+    102661  STUCK     10.97   -525.88    7.71     30   64.83         85   ARC R
+    102662  SUCCESS    8.72    144.04    3.17     24   43.84         67   ARC R
+    102663  SUCCESS   10.00    -97.10    3.09     41   65.62         77   GOAL
+    102664  STUCK      9.98   -364.05    4.63     31   32.75         77   ARC R
+    102665  TIMEOUT   14.02  -1257.45    4.46     90  191.26        108   ARC R
+    102666  SUCCESS    7.95    513.00    3.00      7    6.41         62   ARC R
+    102667  SUCCESS   10.83    289.56    3.18     14   20.85         84   GOAL
+    102668  STUCK     11.10   -447.48    4.72     25   51.00         86   ARC R
+    102669  SUCCESS   10.62    208.60    3.02     17   29.78         82   ARC R
+    102670  STUCK     11.77   -632.16    4.77     42   77.52         91   GOAL
+    102671  STUCK     12.43   -677.61    7.07     49   79.25         96   WIDE L
+    102672  TIMEOUT   14.02   -687.22    7.29     63   82.95        108   ARC R
+    102673  SUCCESS   11.38   -120.54    3.14     31   74.29         88   ARC R
+    102674  SUCCESS    9.18    -69.03    3.04     33   67.99         71   ARC R
+    102675  SUCCESS   10.45    194.96    3.05     21   32.38         81   GOAL
+    102676  SUCCESS   13.17     57.90    3.11     29   43.56        102   GOAL
+    102677  SUCCESS    9.32    -31.37    3.24     35   60.66         72   ARC R
+    102678  SUCCESS   10.37    100.07    3.17     26   47.21         80   ARC R
+    102679  STUCK     11.72   -372.89    3.72     24   35.69         91   ARC R
+    102680  SUCCESS    9.23     60.40    3.22     28   52.33         71   ARC R
+    102681  SUCCESS   10.50   -309.46    3.06     42   93.25         81   ARC R
+    102682  STUCK     11.83   -710.06    4.99     49   90.43         91   GOAL
+    102683  STUCK     12.78  -1121.74    6.89     59  168.36         99   ARC R
+    102684  SUCCESS    8.68    207.81    3.06     21   33.73         67   ARC R
+
+
+REPORT-LEVEL NEXT STEPS
+  - Compare best time, recent average successful time, and manual personal best. If best time is much lower than recent average, the model is not reliably that fast.
+  - If bad-looking runs keep high reward, reduce shaping reward that can be farmed without finishing and make terminal success dominate the score.
+  - If 250000x reports only a few hundred actual x, the bottleneck is CPU simulation, not the rest of the computer. Keep the UI responsive by trusting actual speed and reducing active model work.
+  - Use this report after each tuning pass. Look for lower wall/collision averages, higher recent success rate, and a smaller gap between best run and average success time.

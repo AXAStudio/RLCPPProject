@@ -1,6 +1,7 @@
 #pragma once
 #include "raylib.h"
 #include "raymath.h"
+#include <array>
 #include <vector>
 #include <cmath>
 #include "Box.h"
@@ -51,8 +52,10 @@ const float DASH_POWER             = 23.0f;
 const float DASH_TIME              = 0.18f;
 const float DASH_END_DRAG          = 5.0f;
 const float DASH_AIR_LIFT          = 2.2f;
+const float DASH_VERTICAL_POWER    = 12.0f;
 const float DASH_FOV_BOOST         = 18.0f;
 const float DASH_TILT              = 6.0f;
+const float KATANA_FOV_BOOST       = 8.0f;
 
 const float RL_MAX_EPISODE_TIME    = 14.0f;
 const float RL_STUCK_TIME          = 2.75f;
@@ -68,6 +71,7 @@ struct RLControl {
     bool slide = false;
     float yawDelta = 0.0f;
     float pitchDelta = 0.0f;
+    float aimPitch = 0.0f;
 };
 
 inline float RLHorizontalDistance(const Vector3& a, const Vector3& b) {
@@ -151,6 +155,9 @@ bool ResolveCollision(Vector3& pos, Vector3& vel, float radius, const Box& box, 
 }
 
 struct Player {
+    static constexpr int RL_STATE_SIZE = 33;
+    using RLState = std::array<float, RL_STATE_SIZE>;
+
     Vector3 position = { 0, 5.0f, 4 };
     Vector3 velocity = { 0, 0, 0 };
     Vector3 lastMoveDir = { 0, 0, 1 };
@@ -192,7 +199,12 @@ struct Player {
     float rlNoProgressTimer = 0.0f;
     float rlAreaTimer = 0.0f;
     float rlLastProgress = 0.0f;
+    float rlWallImpactPenalty = 0.0f;
+    float rlSpeedLossPenalty = 0.0f;
+    float rlCollisionPenaltyTotal = 0.0f;
     int rlSteps = 0;
+    int rlWallHits = 0;
+    bool rlHitWallThisStep = false;
     bool rlDone = false;
     bool rlSucceeded = false;
     bool rlTimedOut = false;
@@ -206,6 +218,10 @@ struct Player {
     Camera3D camera = {};
 
     void Update(float dt, const std::vector<Box>& obstacles, bool meleeLocked, bool katanaActive, float katanaNorm, bool useRL = false, const RLControl& rlControl = RLControl()) {
+        rlWallImpactPenalty = 0.0f;
+        rlSpeedLossPenalty = 0.0f;
+        rlHitWallThisStep = false;
+
         if (useRL) {
             yaw -= rlControl.yawDelta;
             pitch = Clamp(pitch - rlControl.pitchDelta, -89.0f, 89.0f);
@@ -254,11 +270,18 @@ struct Player {
 
             Vector3 preferredDir = (Vector3Length(moveInput) > 0.1f) ? moveInput : lastMoveDir;
             if (Vector3Length(preferredDir) <= 0.1f) preferredDir = fwd;
-            dashDir = Vector3Normalize(preferredDir);
+            float pitchForDash = useRL ? rlControl.aimPitch : pitch;
+            float pitchSin = sinf(DEG2RAD * Clamp(pitchForDash, -35.0f, 35.0f));
+            float horizontalScale = sqrtf(fmaxf(0.12f, 1.0f - pitchSin * pitchSin));
+            dashDir = Vector3Normalize({
+                preferredDir.x * horizontalScale,
+                pitchSin,
+                preferredDir.z * horizontalScale
+            });
 
             velocity.x = dashDir.x * DASH_POWER;
             velocity.z = dashDir.z * DASH_POWER;
-
+            velocity.y = fmaxf(velocity.y, dashDir.y * DASH_VERTICAL_POWER);
             if (!onGround && velocity.y < DASH_AIR_LIFT) velocity.y = DASH_AIR_LIFT;
 
             isSliding = false;
@@ -375,6 +398,7 @@ struct Player {
 
             velocity.x = dashDir.x * (DASH_POWER * (0.72f + 0.28f * dashControl));
             velocity.z = dashDir.z * (DASH_POWER * (0.72f + 0.28f * dashControl));
+            velocity.y = fmaxf(velocity.y, dashDir.y * (DASH_VERTICAL_POWER * 0.55f * dashControl));
         } else {
             velocity.x = Lerp(velocity.x, velocity.x * 0.98f, dt * DASH_END_DRAG);
             velocity.z = Lerp(velocity.z, velocity.z * 0.98f, dt * DASH_END_DRAG);
@@ -385,12 +409,15 @@ struct Player {
 
         if (!isWallRunning) velocity.y += GRAVITY * dt;
 
+        float preCollisionSpeed = sqrtf(velocity.x * velocity.x + velocity.z * velocity.z);
         position = Vector3Add(position, Vector3Scale(velocity, dt));
 
         bool wasGrounded = onGround;
         onGround = false;
         bool touchedWall = false;
         bool wallRunEligible = false;
+        int sideWallContacts = 0;
+        float sideWallImpact = 0.0f;
 
         if (position.y <= GROUND_Y + PLAYER_HEIGHT / 2.0f) {
             position.y = GROUND_Y + PLAYER_HEIGHT / 2.0f;
@@ -402,9 +429,14 @@ struct Player {
             if (!SphereNearBox(position, PLAYER_RADIUS, box)) continue;
 
             Vector3 hitNormal;
+            Vector3 velocityBeforeResolve = velocity;
             if (ResolveCollision(position, velocity, PLAYER_RADIUS, box, onGround, hitNormal)) {
                 if (fabsf(hitNormal.y) < 0.1f) {
                     touchedWall = true;
+                    sideWallContacts += 1;
+
+                    Vector3 incomingVel = { velocityBeforeResolve.x, 0, velocityBeforeResolve.z };
+                    sideWallImpact += fmaxf(0.0f, -Vector3DotProduct(incomingVel, hitNormal));
 
                     Vector3 horizVel = { velocity.x, 0, velocity.z };
                     Vector3 velDir = (Vector3Length(horizVel) > 0.1f) ? Vector3Normalize(horizVel) : Vector3Zero();
@@ -441,6 +473,33 @@ struct Player {
                         }
                     }
                 }
+            }
+        }
+
+        if (useRL && touchedWall) {
+            float postCollisionSpeed = sqrtf(velocity.x * velocity.x + velocity.z * velocity.z);
+            rlHitWallThisStep = true;
+            rlWallHits += sideWallContacts;
+            rlSpeedLossPenalty = fmaxf(0.0f, preCollisionSpeed - postCollisionSpeed);
+            float routeCompletion = 1.0f - Clamp(
+                RLHorizontalDistance(position, rlTarget) / fmaxf(1.0f, rlStartTargetDistance),
+                0.0f,
+                1.0f
+            );
+            bool finalCubeClimb = routeCompletion > 0.82f && (wallRunEligible || isWallRunning);
+
+            rlWallImpactPenalty =
+                (finalCubeClimb ? 0.48f : 1.0f) *
+                (0.46f * sideWallContacts +
+                0.15f * sideWallImpact +
+                0.23f * rlSpeedLossPenalty);
+
+            if ((wallRunEligible || isWallRunning) && !finalCubeClimb) {
+                rlWallImpactPenalty += 0.22f * sideWallContacts;
+            }
+
+            if (!wallRunEligible && !isWallRunning && isDashing) {
+                rlWallImpactPenalty += 0.55f;
             }
         }
 
@@ -557,7 +616,12 @@ struct Player {
         rlNoProgressTimer = 0.0f;
         rlAreaTimer = 0.0f;
         rlLastProgress = 0.0f;
+        rlWallImpactPenalty = 0.0f;
+        rlSpeedLossPenalty = 0.0f;
+        rlCollisionPenaltyTotal = 0.0f;
         rlSteps = 0;
+        rlWallHits = 0;
+        rlHitWallThisStep = false;
         rlDone = false;
         rlSucceeded = false;
         rlTimedOut = false;
@@ -566,12 +630,12 @@ struct Player {
         rlAreaAnchor = start;
     }
 
-    std::vector<float> GetRLState() const {
+    RLState GetRLState() const {
         static const std::vector<Box> noObstacles;
         return GetRLState(noObstacles);
     }
 
-    std::vector<float> GetRLState(const std::vector<Box>& obstacles) const {
+    RLState GetRLState(const std::vector<Box>& obstacles) const {
         float dist = RLHorizontalDistance(position, rlTarget);
         float completion = 1.0f - Clamp(dist / fmaxf(1.0f, rlStartTargetDistance), 0.0f, 1.0f);
         float timeUsed = rlEpisodeTime / RL_MAX_EPISODE_TIME;
@@ -579,17 +643,16 @@ struct Player {
         float areaPressure = Clamp(rlAreaTimer / RL_STUCK_TIME, 0.0f, 2.0f);
         float noProgressPressure = Clamp(rlNoProgressTimer / RL_STUCK_TIME, 0.0f, 2.0f);
         float progressSignal = Clamp(rlLastProgress * 5.0f, -1.0f, 1.0f);
+        float horizontalSpeed = GetHorizontalSpeed();
         Vector3 dir = RLFlatDirection(position, rlTarget);
         Vector3 sensorOrigin = { position.x, position.y + 0.2f, position.z };
         Vector3 left = RLRotateFlat(dir, -45.0f);
         Vector3 right = RLRotateFlat(dir, 45.0f);
-        Vector3 hardLeft = RLRotateFlat(dir, -90.0f);
-        Vector3 hardRight = RLRotateFlat(dir, 90.0f);
         float forwardClear = RLSensorClearance(sensorOrigin, dir, obstacles, RL_SENSOR_RANGE);
         float leftClear = RLSensorClearance(sensorOrigin, left, obstacles, RL_SENSOR_RANGE);
         float rightClear = RLSensorClearance(sensorOrigin, right, obstacles, RL_SENSOR_RANGE);
-        float hardLeftClear = RLSensorClearance(sensorOrigin, hardLeft, obstacles, RL_SENSOR_RANGE);
-        float hardRightClear = RLSensorClearance(sensorOrigin, hardRight, obstacles, RL_SENSOR_RANGE);
+        float hardLeftClear = Clamp(leftClear * 0.75f + forwardClear * 0.25f, 0.0f, 1.0f);
+        float hardRightClear = Clamp(rightClear * 0.75f + forwardClear * 0.25f, 0.0f, 1.0f);
         float bestSideClear = fmaxf(leftClear, rightClear);
         float minClear = fminf(forwardClear, bestSideClear);
         float sideClearDiff = rightClear - leftClear;
@@ -601,7 +664,8 @@ struct Player {
             completion,
             velocity.x / 20.0f,
             velocity.z / 20.0f,
-            GetHorizontalSpeed() / 30.0f,
+            pitch / 45.0f,
+            horizontalSpeed / 30.0f,
             dashCooldown / DASH_COOLDOWN_TIME,
             stamina / MAX_STAMINA,
             onGround ? 1.0f : 0.0f,
@@ -621,7 +685,7 @@ struct Player {
             bestSideClear,
             sideClearDiff,
             completion * timeLeft,
-            completion * GetHorizontalSpeed() / 30.0f,
+            completion * horizontalSpeed / 30.0f,
             completion * forwardClear,
             completion * bestSideClear,
             timeLeft * progressSignal,
@@ -641,6 +705,7 @@ struct Player {
         float timeUsed = Clamp(rlEpisodeTime / RL_MAX_EPISODE_TIME, 0.0f, 1.0f);
         Vector3 targetDir = RLFlatDirection(position, rlTarget);
         float goalVelocity = velocity.x * targetDir.x + velocity.z * targetDir.z;
+        float horizontalSpeed = GetHorizontalSpeed();
         float newBestProgress = 0.0f;
         rlLastProgress = progress;
 
@@ -659,35 +724,103 @@ struct Player {
             rlNoProgressTimer += dt;
         }
 
-        float reward = progress * 0.55f + newBestProgress * 1.15f;
-        reward -= (0.10f + timeUsed * (1.0f - completion) * 0.18f) * dt;
-        reward += Clamp(goalVelocity / 24.0f, -1.0f, 1.0f) * 0.035f;
-        if (progress > 0.0f) reward += completion * 0.040f;
-        if (progress < -0.01f) reward += progress * 0.55f;
+        float cleanRunFactor = Clamp(1.0f - rlCollisionPenaltyTotal / 42.0f - (float)rlWallHits / 36.0f, 0.25f, 1.0f);
+        float reward = (progress > 0.0f ? progress * 0.22f * cleanRunFactor : progress * 1.80f) + newBestProgress * 0.95f * cleanRunFactor;
+        reward -= (0.30f + timeUsed * (1.0f - completion) * 0.78f) * dt;
+        reward += Clamp(goalVelocity / 24.0f, -1.0f, 1.0f) * 0.012f;
+        if (progress > 0.0f && goalVelocity > 1.0f && rlWallImpactPenalty <= 0.0f) reward += completion * 0.010f * cleanRunFactor;
+        if (progress < -0.01f) reward += progress * 1.05f;
+
+        if (rlWallImpactPenalty > 0.0f) {
+            float collisionEscalation = 1.0f + Clamp((float)rlWallHits / 24.0f, 0.0f, 1.5f);
+            reward -= rlWallImpactPenalty * collisionEscalation;
+            rlCollisionPenaltyTotal += rlWallImpactPenalty;
+            if (progress <= 0.02f) reward -= 0.42f;
+            if (isDashing) reward -= 0.24f;
+        }
+
+        if (isWallRunning) {
+            float finalClimb = Clamp((completion - 0.82f) / 0.16f, 0.0f, 1.0f);
+            bool productiveFinalClimb = finalClimb > 0.0f && progress > -0.015f && goalVelocity > 0.0f;
+
+            if (productiveFinalClimb) {
+                float climbHeight = Clamp((position.y - (rlTarget.y - 2.6f)) / 2.6f, 0.0f, 1.0f);
+                reward += finalClimb * (0.018f + climbHeight * 0.018f + Clamp(goalVelocity / 24.0f, 0.0f, 1.0f) * 0.026f);
+            } else {
+                reward -= (0.24f + 0.18f * (1.0f - completion)) * dt;
+                if (progress <= 0.0f) reward -= 0.09f;
+            }
+        }
+
         if (rlNoProgressTimer > 0.65f) {
             float noProgress = rlNoProgressTimer - 0.65f;
-            reward -= noProgress * noProgress * 0.095f * dt;
+            reward -= (noProgress * noProgress * 0.36f + noProgress * 0.12f) * dt;
         }
-        if (GetHorizontalSpeed() < 0.35f) reward -= 0.04f * dt;
-        if (isDashing && progress <= 0.0f) reward -= 0.025f;
+        if (horizontalSpeed < 0.75f && completion < 0.96f) reward -= 0.20f * dt;
+        if (horizontalSpeed < 2.0f && rlHitWallThisStep) reward -= 0.28f;
+        if (isDashing && progress <= 0.0f) reward -= 0.12f;
 
         if (rlAreaTimer > RL_AREA_GRACE_TIME) {
             float lingering = rlAreaTimer - RL_AREA_GRACE_TIME;
-            reward -= (lingering * lingering * 0.095f + lingering * 0.060f) * dt;
+            reward -= (lingering * lingering * 0.34f + lingering * 0.20f) * dt;
         }
 
+        auto capProjectedEpisodeReward = [&](float maxTotal) {
+            float projectedTotal = rlEpisodeReward + reward;
+            if (projectedTotal > maxTotal) {
+                reward -= projectedTotal - maxTotal;
+            }
+        };
+
         if (currentDistance < RL_GOAL_RADIUS) {
-            reward += 95.0f + fmaxf(0.0f, RL_MAX_EPISODE_TIME - rlEpisodeTime) * 4.0f + completion * 30.0f;
+            float timeBonus = fmaxf(0.0f, RL_MAX_EPISODE_TIME - rlEpisodeTime) * 13.0f;
+            float speedBonus = Clamp(horizontalSpeed / 22.0f, 0.0f, 1.0f) * 12.0f;
+            float dirtyPenalty = rlCollisionPenaltyTotal * 3.60f + rlWallHits * 1.25f;
+            float cleanBonus = fmaxf(0.0f, 60.0f - rlCollisionPenaltyTotal * 4.2f - rlWallHits * 0.85f);
+            reward += 280.0f + timeBonus + completion * 90.0f + speedBonus + cleanBonus;
+            reward -= rlCollisionPenaltyTotal * 1.75f + rlWallHits * 0.50f + dirtyPenalty;
+
+            if (rlCollisionPenaltyTotal > 55.0f || rlWallHits > 28) {
+                float collisionOverflow = fmaxf(0.0f, rlCollisionPenaltyTotal - 55.0f);
+                float wallOverflow = fmaxf(0.0f, (float)rlWallHits - 28.0f);
+                float dirtySuccessCeiling = 60.0f - collisionOverflow * 1.55f - wallOverflow * 2.10f;
+                capProjectedEpisodeReward(fmaxf(-55.0f, dirtySuccessCeiling));
+            }
+
             rlDone = true;
             rlSucceeded = true;
         } else if (rlEpisodeTime >= RL_MAX_EPISODE_TIME) {
-            reward -= 75.0f + currentDistance * 1.10f + (1.0f - completion) * 58.0f + rlAreaTimer * 3.0f + rlNoProgressTimer * 6.5f;
+            reward -= 175.0f +
+                currentDistance * 1.70f +
+                (1.0f - completion) * 135.0f +
+                rlAreaTimer * 6.2f +
+                rlNoProgressTimer * 12.5f +
+                rlCollisionPenaltyTotal * 2.55f +
+                rlWallHits * 0.80f;
+            capProjectedEpisodeReward(-120.0f);
             rlDone = true;
             rlTimedOut = true;
         } else if (rlNoProgressTimer >= RL_STUCK_TIME) {
-            reward -= 65.0f + currentDistance * 0.90f + rlAreaTimer * 3.3f + rlNoProgressTimer * 8.5f;
+            reward -= 165.0f +
+                currentDistance * 1.50f +
+                rlAreaTimer * 7.0f +
+                rlNoProgressTimer * 15.5f +
+                rlCollisionPenaltyTotal * 2.75f +
+                rlWallHits * 0.90f;
+            capProjectedEpisodeReward(-135.0f);
             rlDone = true;
             rlStuck = true;
+        }
+
+        if (!rlDone) {
+            float shapingCeiling =
+                -8.0f +
+                completion * 105.0f +
+                fmaxf(0.0f, RL_MAX_EPISODE_TIME - rlEpisodeTime) * 1.2f -
+                rlCollisionPenaltyTotal * 1.85f -
+                rlWallHits * 0.55f;
+            if (completion < 0.25f) shapingCeiling = fminf(shapingCeiling, 18.0f + completion * 55.0f);
+            capProjectedEpisodeReward(fmaxf(-40.0f, shapingCeiling));
         }
 
         rlPreviousTargetDistance = currentDistance;

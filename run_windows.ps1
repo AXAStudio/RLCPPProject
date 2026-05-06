@@ -14,6 +14,7 @@ function build-game {
     $RAYLIB_SRC = "C:/raylib/raylib/src"
 
     & "C:/msys64/ucrt64/bin/g++.exe" main.cpp -o mygame.exe `
+        -O2 -DNDEBUG -std=gnu++17 `
         "-I$RAYLIB_SRC" `
         "-L$RAYLIB_SRC" `
         -lraylib -lopengl32 -lgdi32 -lwinmm 2>&1

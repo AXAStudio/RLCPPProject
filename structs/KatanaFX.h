@@ -7,7 +7,6 @@ const float KATANA_COOLDOWN_TIME   = 0.55f;
 const float KATANA_SWING_TIME      = 0.30f;
 const float KATANA_RANGE           = 4.5f;
 const float KATANA_RADIUS          = 0.9f;
-const float KATANA_FOV_BOOST       = 8.0f;
 
 static float EaseOutSine(float t) {
     return sinf((t * PI) * 0.5f);
@@ -21,7 +20,6 @@ struct KatanaFX {
     float cooldown = 0.0f;
     float slashSide = 1.0f;
 
-    // ─────────────────────────────────────────
     void Trigger() {
         if (cooldown > 0.0f) return;
         active = true;
@@ -101,7 +99,6 @@ struct KatanaFX {
         );
     }
 
-    // 🔥 FIXED: No twist, clean slash arc
     Vector3 GetBladeDirection(const Camera3D& cam) const {
         Vector3 forward, right, up;
         GetWeaponBasis(cam, forward, right, up);
@@ -148,7 +145,6 @@ struct KatanaFX {
         Vector3 guardCenter = Vector3Lerp(handleStart, bladeStart, 0.5f);
         Vector3 pommelPos   = Vector3Add(handleEnd, Vector3Scale(handleDir, 0.035f));
 
-        // 🔥 stable guard direction (no flipping)
         Vector3 guardDir = Vector3Normalize(Vector3CrossProduct(bladeDir, up));
 
         // edge faces slash direction
