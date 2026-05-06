@@ -2,11 +2,14 @@
 #include "raymath.h"
 #include "rlgl.h"
 #include <algorithm>
+#include <cctype>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <system_error>
 #include <vector>
 #include <cmath>
 #include "structs/Box.h"
@@ -16,6 +19,17 @@
 #include "structs/Player.h"
 #include "structs/RLAgent.h"
 #include "structs/World.h"
+
+namespace fs = std::filesystem;
+
+const char* RL_MODEL_DIRECTORY = "rl_models";
+const char* RL_MODEL_EXTENSION = ".rlmodel";
+const char* RL_MODEL_MAGIC = "RL_MODEL_V1";
+const float RL_AUTOSAVE_INTERVAL = 3.0f;
+const char* MANUAL_RUN_DIRECTORY = "manual_runs";
+const char* MANUAL_RUN_EXTENSION = ".manualrun";
+const char* MANUAL_RUN_MAGIC = "MANUAL_RUN_V1";
+const int MANUAL_RUN_KEEP_COUNT = 2;
 
 const char* postProcessCode = R"(
 #version 330
@@ -97,6 +111,43 @@ const int TRAINING_SPEED_OPTION_COUNT = 11;
 const float TRAINING_SPEED_OPTIONS[TRAINING_SPEED_OPTION_COUNT] = { 1.0f, 10.0f, 100.0f, 1000.0f, 2500.0f, 5000.0f, 10000.0f, 25000.0f, 50000.0f, 100000.0f, 250000.0f };
 const char* TRAINING_SPEED_LABELS[TRAINING_SPEED_OPTION_COUNT] = { "1x", "10x", "100x", "1000x", "2500x", "5000x", "10000x", "25000x", "50000x", "100000x", "250000x" };
 
+struct RLModelLibrary {
+    std::vector<std::string> files;
+    int selectedFile = 0;
+    std::string status = "MODEL AUTOSAVE READY";
+
+    bool HasFiles() const {
+        return !files.empty();
+    }
+
+    std::string SelectedPath() const {
+        if (files.empty()) return "";
+        int index = std::max(0, std::min(selectedFile, (int)files.size() - 1));
+        return files[index];
+    }
+
+    std::string SelectedFileName() const {
+        std::string path = SelectedPath();
+        return path.empty() ? "no saved model files yet" : fs::path(path).filename().string();
+    }
+};
+
+struct RLPersistenceState {
+    float autosaveTimer = 0.0f;
+    int savedStartedEpisodes = -1;
+    int savedFinishedEpisodes = -1;
+    int savedBestFrameCount = -1;
+    int savedManualGuidance = -1;
+};
+
+enum class RLModelFileAction {
+    None,
+    Previous,
+    Next,
+    Load,
+    SaveSnapshot
+};
+
 Rectangle TrainingSpeedButtonRect(int index) {
     int col = index % 4;
     int row = index / 4;
@@ -110,6 +161,22 @@ Rectangle TrainingSpeedButtonRect(int index) {
 
 Rectangle BestRunButtonRect() {
     return { 24.0f, 430.0f, 154.0f, 30.0f };
+}
+
+Rectangle ModelFilePrevButtonRect() {
+    return { 24.0f, 520.0f, 34.0f, 30.0f };
+}
+
+Rectangle ModelFileLoadButtonRect() {
+    return { 64.0f, 520.0f, 70.0f, 30.0f };
+}
+
+Rectangle ModelFileSaveButtonRect() {
+    return { 140.0f, 520.0f, 92.0f, 30.0f };
+}
+
+Rectangle ModelFileNextButtonRect() {
+    return { 238.0f, 520.0f, 34.0f, 30.0f };
 }
 
 int HandleTrainingSpeedButtons(int currentIndex) {
@@ -149,6 +216,30 @@ bool HandleBestRunButton(bool currentValue) {
 bool HandleSoloTrainingButton(bool currentValue) {
     if (IsKeyPressed(KEY_M)) return !currentValue;
     return currentValue;
+}
+
+RLModelFileAction HandleModelFileControls() {
+    Vector2 mouse = GetMousePosition();
+
+    if (CheckCollisionPointRec(mouse, ModelFilePrevButtonRect()) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        return RLModelFileAction::Previous;
+    }
+    if (CheckCollisionPointRec(mouse, ModelFileNextButtonRect()) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        return RLModelFileAction::Next;
+    }
+    if (CheckCollisionPointRec(mouse, ModelFileLoadButtonRect()) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        return RLModelFileAction::Load;
+    }
+    if (CheckCollisionPointRec(mouse, ModelFileSaveButtonRect()) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        return RLModelFileAction::SaveSnapshot;
+    }
+
+    if (IsKeyPressed(KEY_LEFT_BRACKET)) return RLModelFileAction::Previous;
+    if (IsKeyPressed(KEY_RIGHT_BRACKET)) return RLModelFileAction::Next;
+    if (IsKeyPressed(KEY_L)) return RLModelFileAction::Load;
+    if (IsKeyPressed(KEY_S)) return RLModelFileAction::SaveSnapshot;
+
+    return RLModelFileAction::None;
 }
 
 double TrainingWallBudgetSeconds(float speedScale, bool turboTraining) {
@@ -239,12 +330,34 @@ void DrawRLRunnerLabels(const RLTrainer& trainer, const Camera3D& camera, bool b
     }
 }
 
-void DrawRLTrainingOverlay(const RLTrainer& trainer, int speedIndex, int trainingSteps, float simulatedSeconds, float pendingSimSeconds, float achievedSpeedScale, bool bestRunView, bool turboTraining, bool soloTraining) {
+std::string TruncateTextToWidth(const std::string& text, int maxWidth, int fontSize) {
+    if (MeasureText(text.c_str(), fontSize) <= maxWidth) return text;
+
+    std::string suffix = text;
+    while (!suffix.empty() && MeasureText(("..." + suffix).c_str(), fontSize) > maxWidth) {
+        suffix.erase(suffix.begin());
+    }
+
+    return "..." + suffix;
+}
+
+void DrawRLTrainingOverlay(
+    const RLTrainer& trainer,
+    int speedIndex,
+    int trainingSteps,
+    float simulatedSeconds,
+    float pendingSimSeconds,
+    float achievedSpeedScale,
+    bool bestRunView,
+    bool turboTraining,
+    bool soloTraining,
+    const RLModelLibrary& modelLibrary
+) {
     const RLRunner& active = trainer.ActiveRunner();
     const int best = trainer.BestRunnerIndex();
 
-    DrawRectangle(12, 12, 390, 476, (Color){ 8, 10, 12, 210 });
-    DrawRectangleLines(12, 12, 390, 476, Fade(WHITE, 0.24f));
+    DrawRectangle(12, 12, 390, 556, (Color){ 8, 10, 12, 210 });
+    DrawRectangleLines(12, 12, 390, 556, Fade(WHITE, 0.24f));
     DrawText(bestRunView ? "BEST RUN VIEW" : "RL TRAINING VIEW", 24, 24, 20, GREEN);
     DrawText("T manual  V camera  B best  H turbo  M solo", 24, 50, 14, LIGHTGRAY);
     DrawText("TAB/arrows select  1-0/- speed  P report", 24, 68, 14, LIGHTGRAY);
@@ -294,6 +407,36 @@ void DrawRLTrainingOverlay(const RLTrainer& trainer, int speedIndex, int trainin
             : "SELECTED BEST: none yet";
         DrawText(bestInfo, 194, 436, 14, active.HasBestRun() ? GOLD : LIGHTGRAY);
     }
+
+    DrawText("MODEL FILES: [ ] browse  L load  S snapshot", 24, 472, 13, LIGHTGRAY);
+    Color statusColor = modelLibrary.status.find("FAILED") == std::string::npos ? GREEN : ORANGE;
+    std::string statusText = TruncateTextToWidth(modelLibrary.status, 344, 13);
+    DrawText(statusText.c_str(), 24, 490, 13, statusColor);
+    std::string selectedFile = TruncateTextToWidth(modelLibrary.SelectedFileName(), 344, 13);
+    DrawText(selectedFile.c_str(), 24, 506, 13, SKYBLUE);
+
+    Rectangle prevButton = ModelFilePrevButtonRect();
+    Rectangle loadButton = ModelFileLoadButtonRect();
+    Rectangle saveButton = ModelFileSaveButtonRect();
+    Rectangle nextButton = ModelFileNextButtonRect();
+    Vector2 modelMouse = GetMousePosition();
+
+    auto drawModelButton = [&](Rectangle rect, const char* label, bool enabled) {
+        bool hot = enabled && CheckCollisionPointRec(modelMouse, rect);
+        Color fill = enabled
+            ? (hot ? (Color){ 72, 78, 84, 235 } : (Color){ 34, 38, 44, 235 })
+            : (Color){ 24, 26, 30, 180 };
+        Color text = enabled ? WHITE : Fade(WHITE, 0.38f);
+        DrawRectangleRounded(rect, 0.18f, 6, fill);
+        DrawRectangleRoundedLines(rect, 0.18f, 6, Fade(WHITE, enabled ? 0.22f : 0.10f));
+        int textWidth = MeasureText(label, 15);
+        DrawText(label, (int)(rect.x + (rect.width - textWidth) * 0.5f), (int)(rect.y + 8), 15, text);
+    };
+
+    drawModelButton(prevButton, "<", modelLibrary.HasFiles());
+    drawModelButton(loadButton, "LOAD", modelLibrary.HasFiles());
+    drawModelButton(saveButton, "SNAPSHOT", true);
+    drawModelButton(nextButton, ">", modelLibrary.HasFiles());
 
     int panelX = SCREEN_WIDTH - 420;
     DrawRectangle(panelX, 12, 408, 30 + (int)trainer.runners.size() * 54, (Color){ 8, 10, 12, 210 });
@@ -347,21 +490,64 @@ void DrawManualBestGhost(const RLRunner& runner, const Vector3& playerPosition, 
     DrawSphere({ p.x, p.y + 1.05f, p.z }, 0.24f, runner.model.color);
 }
 
+struct ManualInputFrame {
+    float time = 0.0f;
+    bool w = false;
+    bool a = false;
+    bool s = false;
+    bool d = false;
+    bool jump = false;
+    bool dash = false;
+    bool slide = false;
+    bool slash = false;
+    bool isDashing = false;
+    bool isWallRunning = false;
+    float dashCooldown = 0.0f;
+    float dashVisualTimer = 0.0f;
+};
+
+ManualInputFrame ManualInputFromReplayFrame(const RLReplayFrame& frame) {
+    ManualInputFrame input;
+    input.time = frame.time;
+
+    if (frame.action >= 0 && frame.action < (int)RLActions().size()) {
+        const RLDiscreteAction& action = RLActions()[frame.action];
+        input.w = action.strength > 0.1f && fabsf(action.angleDegrees) < 105.0f;
+        input.a = action.angleDegrees < -8.0f;
+        input.d = action.angleDegrees > 8.0f;
+        input.s = fabsf(action.angleDegrees) > 105.0f;
+        input.jump = action.jump;
+        input.dash = action.dash;
+        input.slide = action.slide;
+        input.isDashing = action.dash;
+    }
+
+    return input;
+}
+
 struct ManualRunReplay {
     std::vector<RLReplayFrame> frames;
     std::vector<Vector3> trail;
     std::vector<RLExperience> experiences;
+    std::vector<ManualInputFrame> inputs;
     bool finished = false;
+    bool savedToLibrary = false;
     float finishTime = 0.0f;
     float lastFrameTime = 0.0f;
+    std::string sourcePath;
+    std::string label;
 
     void Reset() {
         frames.clear();
         trail.clear();
         experiences.clear();
+        inputs.clear();
         finished = false;
+        savedToLibrary = false;
         finishTime = 0.0f;
         lastFrameTime = 0.0f;
+        sourcePath.clear();
+        label.clear();
     }
 
     void Record(
@@ -369,13 +555,18 @@ struct ManualRunReplay {
         const Player::RLState& state,
         int action,
         float reward,
-        const Player::RLState& nextState
+        const Player::RLState& nextState,
+        const ManualInputFrame& input
     ) {
         if (finished) return;
         if (player.rlDone && !player.rlSucceeded) return;
 
+        ManualInputFrame savedInput = input;
+        savedInput.time = player.rlEpisodeTime;
+        inputs.push_back(savedInput);
+
         if (frames.empty() || player.rlDone || player.rlEpisodeTime - lastFrameTime >= 1.0f / 30.0f) {
-            frames.push_back({ player.position, player.camera, player.rlEpisodeTime, -1 });
+            frames.push_back({ player.position, player.camera, player.rlEpisodeTime, action });
             lastFrameTime = player.rlEpisodeTime;
         }
 
@@ -431,6 +622,61 @@ struct ManualRunReplay {
         frame.camera.fovy = Lerp(a.camera.fovy, b.camera.fovy, t);
         frame.time = Lerp(a.time, b.time, t);
         return frame;
+    }
+
+    ManualInputFrame ManualInputAt(float replayTime) const {
+        if (inputs.empty()) return ManualInputFromReplayFrame(FrameAt(replayTime));
+        if (inputs.size() == 1 || replayTime <= inputs.front().time) return inputs.front();
+        if (replayTime >= inputs.back().time) return inputs.back();
+
+        int nextIndex = 1;
+        while (nextIndex < (int)inputs.size() && inputs[nextIndex].time < replayTime) {
+            nextIndex += 1;
+        }
+
+        const ManualInputFrame& before = inputs[nextIndex - 1];
+        const ManualInputFrame& after = inputs[nextIndex];
+        return (replayTime - before.time <= after.time - replayTime) ? before : after;
+    }
+
+    void BackfillInputsFromReplayData() {
+        if (!inputs.empty() || frames.empty()) return;
+
+        inputs.reserve(frames.size());
+        for (const RLReplayFrame& frame : frames) {
+            RLReplayFrame actionFrame = frame;
+            if ((actionFrame.action < 0 || actionFrame.action >= (int)RLActions().size()) && !experiences.empty()) {
+                float ratio = finishTime > 0.001f ? Clamp(frame.time / finishTime, 0.0f, 1.0f) : 0.0f;
+                int experienceIndex = std::min((int)experiences.size() - 1, (int)roundf(ratio * (float)(experiences.size() - 1)));
+                actionFrame.action = experiences[experienceIndex].action;
+            }
+            inputs.push_back(ManualInputFromReplayFrame(actionFrame));
+        }
+    }
+};
+
+struct ManualRunLibrary {
+    std::vector<ManualRunReplay> runs;
+    int selectedRun = 0;
+    std::string status = "MANUAL RUN SAVES READY";
+
+    bool HasRuns() const {
+        return !runs.empty();
+    }
+
+    const ManualRunReplay& ActiveRun() const {
+        int index = std::max(0, std::min(selectedRun, (int)runs.size() - 1));
+        return runs[index];
+    }
+
+    ManualRunReplay& ActiveRun() {
+        int index = std::max(0, std::min(selectedRun, (int)runs.size() - 1));
+        return runs[index];
+    }
+
+    std::string ActiveLabel() const {
+        if (!HasRuns()) return "no saved manual runs yet";
+        return ActiveRun().label.empty() ? fs::path(ActiveRun().sourcePath).filename().string() : ActiveRun().label;
     }
 };
 
@@ -517,6 +763,31 @@ void DrawManualCompletedGhost(const ManualRunReplay& replay, const Vector3& play
     DrawSphere({ p.x, p.y + 1.05f, p.z }, 0.22f, manualColor);
 }
 
+void DrawManualPlayerGhostStats(
+    const ManualRunReplay& replay,
+    const Vector3& playerPosition,
+    const Vector3& goalPoint,
+    float replayTime,
+    int x,
+    int y
+) {
+    if (!replay.HasRun()) return;
+
+    RLReplayFrame ghost = replay.FrameAt(replayTime);
+    float playerDist = RLHorizontalDistance(playerPosition, goalPoint);
+    float ghostDist = RLHorizontalDistance(ghost.position, goalPoint);
+    float ghostLead = playerDist - ghostDist;
+    const char* leadLabel = ghostLead >= 0.0f ? "PLAYER GHOST" : "PLAYER";
+
+    DrawText(
+        TextFormat("PLAYER GHOST: best %.1fs  %s %.1fm", replay.finishTime, leadLabel, fabsf(ghostLead)),
+        x,
+        y,
+        16,
+        GOLD
+    );
+}
+
 void DrawKeyboardKey(Rectangle rect, const char* label, bool active) {
     Color fill = active ? GREEN : (Color){ 28, 32, 38, 225 };
     Color outline = active ? WHITE : Fade(WHITE, 0.28f);
@@ -570,6 +841,38 @@ void DrawAIInputOverlay(const RLRunner& runner, float replayTime) {
     float cy = y + 104.0f;
     DrawCircleLines((int)cx, (int)cy, 24.0f, Fade(WHITE, 0.45f));
     DrawLine((int)cx, (int)cy, (int)(cx + sinf(DEG2RAD * turn) * 22.0f), (int)(cy - cosf(DEG2RAD * turn) * 22.0f), runner.model.color);
+    DrawText(TextFormat("CAM %.0f", lookPitch), (int)cx - 27, (int)cy + 31, 14, LIGHTGRAY);
+}
+
+void DrawManualInputOverlay(const ManualRunReplay& replay, const Vector3& goalPoint, float replayTime) {
+    if (!replay.HasRun()) return;
+
+    ManualInputFrame input = replay.ManualInputAt(replayTime);
+    RLReplayFrame frame = replay.FrameAt(replayTime);
+    bool dashActive = input.dash || input.isDashing || input.dashVisualTimer > 0.0f;
+    Color manualColor = { 255, 224, 92, 255 };
+
+    float x = SCREEN_WIDTH - 238.0f;
+    float y = SCREEN_HEIGHT - 168.0f;
+    DrawRectangle((int)x - 12, (int)y - 12, 226, 150, (Color){ 8, 10, 12, 190 });
+    DrawRectangleLines((int)x - 12, (int)y - 12, 226, 150, Fade(WHITE, 0.22f));
+    DrawText("MANUAL INPUT", (int)x, (int)y - 4, 16, manualColor);
+
+    DrawKeyboardKey({ x + 46, y + 22, 42, 42 }, "W", input.w);
+    DrawKeyboardKey({ x + 0, y + 68, 42, 42 }, "A", input.a);
+    DrawKeyboardKey({ x + 46, y + 68, 42, 42 }, "S", input.s);
+    DrawKeyboardKey({ x + 92, y + 68, 42, 42 }, "D", input.d);
+    DrawKeyboardKey({ x + 148, y + 22, 48, 42 }, "E", dashActive);
+    DrawKeyboardKey({ x + 0, y + 114, 134, 30 }, "SPACE", input.jump);
+
+    Vector3 look = Vector3Subtract(frame.camera.target, frame.camera.position);
+    float lookYaw = atan2f(look.x, look.z) * RAD2DEG;
+    float lookPitch = asinf(Clamp(Vector3Normalize(look).y, -1.0f, 1.0f)) * RAD2DEG;
+    float turn = RLWrapDegrees(lookYaw - RLYawFromDirection(RLFlatDirection(frame.position, goalPoint)));
+    float cx = x + 172.0f;
+    float cy = y + 104.0f;
+    DrawCircleLines((int)cx, (int)cy, 24.0f, Fade(WHITE, 0.45f));
+    DrawLine((int)cx, (int)cy, (int)(cx + sinf(DEG2RAD * turn) * 22.0f), (int)(cy - cosf(DEG2RAD * turn) * 22.0f), manualColor);
     DrawText(TextFormat("CAM %.0f", lookPitch), (int)cx - 27, (int)cy + 31, 14, LIGHTGRAY);
 }
 
@@ -843,7 +1146,8 @@ bool WriteTrainingReport(
     float trainingSimSecondsLastFrame,
     bool turboTraining,
     bool soloTraining,
-    const ManualRunReplay& manualBestReplay
+    const ManualRunReplay& manualBestReplay,
+    const ManualRunLibrary& manualRunLibrary
 ) {
     std::ofstream out(path);
     if (!out.is_open()) return false;
@@ -869,7 +1173,7 @@ bool WriteTrainingReport(
     out << "  best model by trainer ranking: " << trainer.runners[bestIndex].model.name << "\n";
     out << "  target training speed: " << TRAINING_SPEED_LABELS[speedIndex] << " (" << std::fixed << std::setprecision(0) << targetSpeedScale << "x)\n";
     out << "  achieved training speed: " << std::setprecision(1) << achievedSpeedScale << "x\n";
-    out << "  achieved/target ratio: " << std::setprecision(2) << (targetSpeedScale > 0.0f ? achievedSpeedScale / targetSpeedScale : 0.0f) << "\n";
+    out << "  achieved/target ratio: " << std::setprecision(4) << (targetSpeedScale > 0.0f ? achievedSpeedScale / targetSpeedScale : 0.0f) << "\n";
     out << "  runner updates/sec estimate: " << std::setprecision(0) << runnerUpdatesPerSecond << "\n";
     out << "  active model count: " << activeModelCount << "\n";
     out << "  turbo mode: " << (turboTraining ? "on" : "off") << "\n";
@@ -886,6 +1190,10 @@ bool WriteTrainingReport(
     out << "  observation size: " << Player::RL_STATE_SIZE << "\n";
     out << "  discrete action count: " << RLActions().size() << "\n";
     out << "  manual personal best replay: " << (manualBestReplay.HasRun() ? "saved" : "none") << "\n";
+    out << "  saved manual run files: " << manualRunLibrary.runs.size() << " / " << MANUAL_RUN_KEEP_COUNT << " kept\n";
+    if (manualRunLibrary.HasRuns()) {
+        out << "  selected saved manual run: " << manualRunLibrary.ActiveLabel() << "\n";
+    }
     if (manualBestReplay.HasRun()) {
         out << "  manual best finish time: " << std::setprecision(2) << manualBestReplay.finishTime << "s\n";
         out << "  manual best frames/trail/experiences: " << manualBestReplay.frames.size() << " frames, " << manualBestReplay.trail.size() << " trail points, " << manualBestReplay.experiences.size() << " elite samples\n";
@@ -921,24 +1229,24 @@ bool WriteTrainingReport(
     out << "  - Useful next optimizations: profile runner updates/sec, cache obstacle clearance checks per frame, lower replay bursts for weak models, and benchmark with rendering skipped.\n\n";
 
     out << "MODEL SUMMARY TABLE\n";
-    out << "  model          ep    done   succ   succ%   timeout   stuck   best time   best reward   eps    recent succ%   rank\n";
-    out << "  ----------------------------------------------------------------------------------------------------------------------\n";
+    out << "  model              ep       done       succ   succ%    timeout      stuck   best time   best reward    eps  recent succ%        rank\n";
+    out << "  -------------------------------------------------------------------------------------------------------------------------------------\n";
     for (const RLRunner& runner : trainer.runners) {
         int finished = runner.successes + runner.timeouts + runner.stucks;
         RLRecentStats stats = BuildRecentStats(runner, 80);
         out << "  "
             << std::left << std::setw(13) << runner.model.name << std::right
-            << std::setw(6) << runner.episode
-            << std::setw(8) << finished
-            << std::setw(7) << runner.successes
+            << std::setw(10) << runner.episode
+            << std::setw(11) << finished
+            << std::setw(11) << runner.successes
             << std::setw(8) << std::fixed << std::setprecision(1) << SafePercent(runner.successes, finished)
-            << std::setw(10) << runner.timeouts
-            << std::setw(8) << runner.stucks
+            << std::setw(11) << runner.timeouts
+            << std::setw(11) << runner.stucks
             << std::setw(12) << (runner.HasBestRun() ? runner.bestTime : 0.0f)
             << std::setw(14) << runner.bestReward
             << std::setw(7) << runner.model.epsilon
-            << std::setw(12) << SafePercent(stats.successes, stats.count)
-            << std::setw(8) << runner.ReliableSelectionScore()
+            << std::setw(14) << SafePercent(stats.successes, stats.count)
+            << std::setw(12) << runner.ReliableSelectionScore()
             << "\n";
     }
     out << "\n";
@@ -1034,11 +1342,1246 @@ bool WriteTrainingReport(
 
     out << "REPORT-LEVEL NEXT STEPS\n";
     out << "  - Compare best time, recent average successful time, and manual personal best. If best time is much lower than recent average, the model is not reliably that fast.\n";
+    out << "  - Saved manual runs can now be reviewed from the player camera and reused as manual guidance evidence.\n";
     out << "  - If bad-looking runs keep high reward, reduce shaping reward that can be farmed without finishing and make terminal success dominate the score.\n";
     out << "  - If 250000x reports only a few hundred actual x, the bottleneck is CPU simulation, not the rest of the computer. Keep the UI responsive by trusting actual speed and reducing active model work.\n";
     out << "  - Use this report after each tuning pass. Look for lower wall/collision averages, higher recent success rate, and a smaller gap between best run and average success time.\n";
 
     return true;
+}
+
+std::string ModelSlug(const std::string& name) {
+    std::string slug;
+    bool lastWasSeparator = false;
+
+    for (char c : name) {
+        unsigned char value = (unsigned char)c;
+        if (std::isalnum(value)) {
+            slug.push_back((char)std::tolower(value));
+            lastWasSeparator = false;
+        } else if (!lastWasSeparator && !slug.empty()) {
+            slug.push_back('_');
+            lastWasSeparator = true;
+        }
+    }
+
+    while (!slug.empty() && slug.back() == '_') slug.pop_back();
+    return slug.empty() ? "model" : slug;
+}
+
+std::string TimestampForModelFile() {
+    std::time_t now = std::time(nullptr);
+    std::tm* local = std::localtime(&now);
+    if (!local) return "unknown_time";
+
+    std::ostringstream text;
+    text << std::put_time(local, "%Y%m%d_%H%M%S");
+    return text.str();
+}
+
+std::string TimestampForModelText() {
+    std::time_t now = std::time(nullptr);
+    std::tm* local = std::localtime(&now);
+    if (!local) return "unknown time";
+
+    std::ostringstream text;
+    text << std::put_time(local, "%Y-%m-%d %H:%M:%S");
+    return text.str();
+}
+
+std::string FileNameOnly(const std::string& path) {
+    if (path.empty()) return "";
+    return fs::path(path).filename().string();
+}
+
+std::string RunnerAutosavePath(const RLRunner& runner) {
+    fs::path path = fs::path(RL_MODEL_DIRECTORY) / ("autosave_" + ModelSlug(runner.model.name) + RL_MODEL_EXTENSION);
+    return path.string();
+}
+
+std::string RunnerSnapshotPath(const RLRunner& runner) {
+    fs::path path = fs::path(RL_MODEL_DIRECTORY) / (ModelSlug(runner.model.name) + "_" + TimestampForModelFile() + RL_MODEL_EXTENSION);
+    return path.string();
+}
+
+bool EnsureModelDirectory(std::string& error) {
+    std::error_code ec;
+    fs::path directory(RL_MODEL_DIRECTORY);
+    if (fs::exists(directory, ec)) {
+        if (fs::is_directory(directory, ec)) return true;
+        error = std::string(RL_MODEL_DIRECTORY) + " exists but is not a directory";
+        return false;
+    }
+
+    if (!fs::create_directories(directory, ec) || ec) {
+        error = "could not create " + std::string(RL_MODEL_DIRECTORY) + ": " + ec.message();
+        return false;
+    }
+
+    return true;
+}
+
+void SetModelLibraryStatus(RLModelLibrary& library, const std::string& status) {
+    library.status = status;
+}
+
+void RefreshModelLibrary(RLModelLibrary& library) {
+    std::string error;
+    if (!EnsureModelDirectory(error)) {
+        SetModelLibraryStatus(library, "MODEL FOLDER FAILED: " + error);
+        library.files.clear();
+        library.selectedFile = 0;
+        return;
+    }
+
+    std::string previousSelection = library.SelectedPath();
+    std::vector<std::string> files;
+    std::error_code ec;
+    fs::directory_iterator it(RL_MODEL_DIRECTORY, ec);
+    fs::directory_iterator end;
+
+    while (!ec && it != end) {
+        std::error_code entryError;
+        const fs::directory_entry& entry = *it;
+        if (entry.is_regular_file(entryError) && entry.path().extension() == RL_MODEL_EXTENSION) {
+            files.push_back(entry.path().string());
+        }
+        it.increment(ec);
+    }
+
+    std::sort(files.begin(), files.end(), [](const std::string& a, const std::string& b) {
+        return FileNameOnly(a) < FileNameOnly(b);
+    });
+
+    library.files = files;
+    library.selectedFile = 0;
+    for (int i = 0; i < (int)library.files.size(); ++i) {
+        if (library.files[i] == previousSelection) {
+            library.selectedFile = i;
+            break;
+        }
+    }
+
+    if (library.files.empty() && library.status.find("FAILED") == std::string::npos) {
+        SetModelLibraryStatus(library, "AUTOSAVE READY: rl_models/");
+    }
+}
+
+void SelectPreviousModelFile(RLModelLibrary& library) {
+    RefreshModelLibrary(library);
+    if (library.files.empty()) {
+        SetModelLibraryStatus(library, "NO MODEL FILES IN rl_models/");
+        return;
+    }
+
+    library.selectedFile = (library.selectedFile - 1 + (int)library.files.size()) % (int)library.files.size();
+    SetModelLibraryStatus(library, "SELECTED: " + FileNameOnly(library.SelectedPath()));
+}
+
+void SelectNextModelFile(RLModelLibrary& library) {
+    RefreshModelLibrary(library);
+    if (library.files.empty()) {
+        SetModelLibraryStatus(library, "NO MODEL FILES IN rl_models/");
+        return;
+    }
+
+    library.selectedFile = (library.selectedFile + 1) % (int)library.files.size();
+    SetModelLibraryStatus(library, "SELECTED: " + FileNameOnly(library.SelectedPath()));
+}
+
+void WriteFloatVector(std::ofstream& out, const char* label, const std::vector<float>& values) {
+    out << label << " " << values.size();
+    for (float value : values) out << " " << value;
+    out << "\n";
+}
+
+void WriteIntVector(std::ofstream& out, const char* label, const std::vector<int>& values) {
+    out << label << " " << values.size();
+    for (int value : values) out << " " << value;
+    out << "\n";
+}
+
+void WriteFloatMatrix(std::ofstream& out, const char* label, const std::vector<std::vector<float>>& rows) {
+    int rowCount = (int)rows.size();
+    int columnCount = rowCount > 0 ? (int)rows[0].size() : 0;
+
+    out << label << " " << rowCount << " " << columnCount << "\n";
+    for (const auto& row : rows) {
+        for (int i = 0; i < columnCount; ++i) {
+            float value = i < (int)row.size() ? row[i] : 0.0f;
+            out << (i == 0 ? "" : " ") << value;
+        }
+        out << "\n";
+    }
+}
+
+void WriteVector3Values(std::ofstream& out, Vector3 value) {
+    out << value.x << " " << value.y << " " << value.z;
+}
+
+void WriteStateValues(std::ofstream& out, const Player::RLState& state) {
+    for (float value : state) out << " " << value;
+}
+
+void WritePolicySnapshot(std::ofstream& out, const RLPolicySnapshot& snapshot) {
+    out << "best_policy "
+        << (snapshot.valid ? 1 : 0) << " "
+        << snapshot.rawFeatureCount << " "
+        << snapshot.featureCount << " "
+        << snapshot.epsilon << "\n";
+    WriteFloatMatrix(out, "best_policy_weights", snapshot.valid ? snapshot.weights : std::vector<std::vector<float>>());
+    WriteFloatVector(out, "best_policy_action_bias", snapshot.valid ? snapshot.actionBias : std::vector<float>());
+}
+
+void WriteVector3List(std::ofstream& out, const char* label, const std::vector<Vector3>& values) {
+    out << label << " " << values.size() << "\n";
+    for (Vector3 value : values) {
+        WriteVector3Values(out, value);
+        out << "\n";
+    }
+}
+
+void WriteReplayFrames(std::ofstream& out, const char* label, const std::vector<RLReplayFrame>& frames) {
+    out << label << " " << frames.size() << "\n";
+    for (const RLReplayFrame& frame : frames) {
+        WriteVector3Values(out, frame.position);
+        out << " ";
+        WriteVector3Values(out, frame.camera.position);
+        out << " ";
+        WriteVector3Values(out, frame.camera.target);
+        out << " ";
+        WriteVector3Values(out, frame.camera.up);
+        out << " " << frame.camera.fovy
+            << " " << frame.camera.projection
+            << " " << frame.time
+            << " " << frame.action << "\n";
+    }
+}
+
+void WriteExperiences(std::ofstream& out, const char* label, const std::vector<RLExperience>& experiences) {
+    out << label << " " << experiences.size() << "\n";
+    for (const RLExperience& experience : experiences) {
+        out << experience.action
+            << " " << experience.reward
+            << " " << experience.priority
+            << " " << (experience.done ? 1 : 0);
+        WriteStateValues(out, experience.state);
+        WriteStateValues(out, experience.nextState);
+        out << "\n";
+    }
+}
+
+void WriteManualInputs(std::ofstream& out, const std::vector<ManualInputFrame>& inputs) {
+    out << "inputs " << inputs.size() << "\n";
+    for (const ManualInputFrame& input : inputs) {
+        out << input.time
+            << " " << (input.w ? 1 : 0)
+            << " " << (input.a ? 1 : 0)
+            << " " << (input.s ? 1 : 0)
+            << " " << (input.d ? 1 : 0)
+            << " " << (input.jump ? 1 : 0)
+            << " " << (input.dash ? 1 : 0)
+            << " " << (input.slide ? 1 : 0)
+            << " " << (input.slash ? 1 : 0)
+            << " " << (input.isDashing ? 1 : 0)
+            << " " << (input.isWallRunning ? 1 : 0)
+            << " " << input.dashCooldown
+            << " " << input.dashVisualTimer << "\n";
+    }
+}
+
+void WriteRecentEpisodes(std::ofstream& out, const std::vector<RLEpisodeSummary>& episodes) {
+    out << "recent_episodes " << episodes.size() << "\n";
+    for (const RLEpisodeSummary& episode : episodes) {
+        out << episode.episode
+            << " " << episode.time
+            << " " << episode.reward
+            << " " << episode.distanceToGoal
+            << " " << episode.collisionCost
+            << " " << episode.wallHits
+            << " " << episode.decisions
+            << " " << (episode.success ? 1 : 0)
+            << " " << (episode.timeout ? 1 : 0)
+            << " " << (episode.stuck ? 1 : 0)
+            << " " << episode.actionCounts.size();
+        for (int count : episode.actionCounts) out << " " << count;
+        out << "\n";
+    }
+}
+
+bool ReadExpected(std::istream& in, const char* expected, std::string& error) {
+    std::string token;
+    if (!(in >> token)) {
+        error = std::string("missing token: ") + expected;
+        return false;
+    }
+    if (token != expected) {
+        error = "expected " + std::string(expected) + ", found " + token;
+        return false;
+    }
+    return true;
+}
+
+bool ReadFloatVector(std::istream& in, const char* label, std::vector<float>& values, int maxCount, std::string& error) {
+    if (!ReadExpected(in, label, error)) return false;
+
+    int count = 0;
+    if (!(in >> count) || count < 0 || count > maxCount) {
+        error = std::string("bad vector size for ") + label;
+        return false;
+    }
+
+    values.assign(count, 0.0f);
+    for (float& value : values) {
+        if (!(in >> value)) {
+            error = std::string("bad vector value for ") + label;
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool ReadIntVector(std::istream& in, const char* label, std::vector<int>& values, int maxCount, std::string& error) {
+    if (!ReadExpected(in, label, error)) return false;
+
+    int count = 0;
+    if (!(in >> count) || count < 0 || count > maxCount) {
+        error = std::string("bad vector size for ") + label;
+        return false;
+    }
+
+    values.assign(count, 0);
+    for (int& value : values) {
+        if (!(in >> value)) {
+            error = std::string("bad vector value for ") + label;
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool ReadFloatMatrix(std::istream& in, const char* label, std::vector<std::vector<float>>& values, int maxRows, int maxColumns, std::string& error) {
+    if (!ReadExpected(in, label, error)) return false;
+
+    int rows = 0;
+    int columns = 0;
+    if (!(in >> rows >> columns) || rows < 0 || columns < 0 || rows > maxRows || columns > maxColumns) {
+        error = std::string("bad matrix shape for ") + label;
+        return false;
+    }
+    if ((rows == 0) != (columns == 0)) {
+        error = std::string("empty matrix shape mismatch for ") + label;
+        return false;
+    }
+
+    values.assign(rows, std::vector<float>(columns, 0.0f));
+    for (int row = 0; row < rows; ++row) {
+        for (int column = 0; column < columns; ++column) {
+            if (!(in >> values[row][column])) {
+                error = std::string("bad matrix value for ") + label;
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool ReadVector3Values(std::istream& in, Vector3& value) {
+    return (bool)(in >> value.x >> value.y >> value.z);
+}
+
+bool ReadStateValues(std::istream& in, Player::RLState& state) {
+    for (float& value : state) {
+        if (!(in >> value)) return false;
+    }
+    return true;
+}
+
+bool ReadPolicySnapshot(std::istream& in, RLPolicySnapshot& snapshot, std::string& error) {
+    if (!ReadExpected(in, "best_policy", error)) return false;
+
+    int valid = 0;
+    if (!(in >> valid >> snapshot.rawFeatureCount >> snapshot.featureCount >> snapshot.epsilon)) {
+        error = "bad best_policy header";
+        return false;
+    }
+
+    snapshot.valid = valid != 0;
+    if (!ReadFloatMatrix(in, "best_policy_weights", snapshot.weights, 128, 1024, error)) return false;
+    if (!ReadFloatVector(in, "best_policy_action_bias", snapshot.actionBias, 128, error)) return false;
+    return true;
+}
+
+bool ReadVector3List(std::istream& in, const char* label, std::vector<Vector3>& values, int maxCount, std::string& error) {
+    if (!ReadExpected(in, label, error)) return false;
+
+    int count = 0;
+    if (!(in >> count) || count < 0 || count > maxCount) {
+        error = std::string("bad vector3 list size for ") + label;
+        return false;
+    }
+
+    values.assign(count, {});
+    for (Vector3& value : values) {
+        if (!ReadVector3Values(in, value)) {
+            error = std::string("bad vector3 value for ") + label;
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool ReadReplayFrames(std::istream& in, const char* label, std::vector<RLReplayFrame>& frames, int maxCount, std::string& error) {
+    if (!ReadExpected(in, label, error)) return false;
+
+    int count = 0;
+    if (!(in >> count) || count < 0 || count > maxCount) {
+        error = std::string("bad replay frame count for ") + label;
+        return false;
+    }
+
+    frames.assign(count, {});
+    for (RLReplayFrame& frame : frames) {
+        int projection = CAMERA_PERSPECTIVE;
+        if (!ReadVector3Values(in, frame.position) ||
+            !ReadVector3Values(in, frame.camera.position) ||
+            !ReadVector3Values(in, frame.camera.target) ||
+            !ReadVector3Values(in, frame.camera.up) ||
+            !(in >> frame.camera.fovy >> projection >> frame.time >> frame.action)) {
+            error = std::string("bad replay frame for ") + label;
+            return false;
+        }
+        frame.camera.projection = projection;
+    }
+
+    return true;
+}
+
+bool ReadExperiences(std::istream& in, const char* label, std::vector<RLExperience>& experiences, int maxCount, std::string& error) {
+    if (!ReadExpected(in, label, error)) return false;
+
+    int count = 0;
+    if (!(in >> count) || count < 0 || count > maxCount) {
+        error = std::string("bad experience count for ") + label;
+        return false;
+    }
+
+    experiences.assign(count, {});
+    for (RLExperience& experience : experiences) {
+        int done = 0;
+        if (!(in >> experience.action >> experience.reward >> experience.priority >> done) ||
+            !ReadStateValues(in, experience.state) ||
+            !ReadStateValues(in, experience.nextState)) {
+            error = std::string("bad experience for ") + label;
+            return false;
+        }
+        experience.done = done != 0;
+    }
+
+    return true;
+}
+
+bool ReadManualInputsAfterLabel(std::istream& in, std::vector<ManualInputFrame>& inputs, int maxCount, std::string& error) {
+    int count = 0;
+    if (!(in >> count) || count < 0 || count > maxCount) {
+        error = "bad manual input count";
+        return false;
+    }
+
+    inputs.assign(count, {});
+    for (ManualInputFrame& input : inputs) {
+        int w = 0;
+        int a = 0;
+        int s = 0;
+        int d = 0;
+        int jump = 0;
+        int dash = 0;
+        int slide = 0;
+        int slash = 0;
+        int isDashing = 0;
+        int isWallRunning = 0;
+
+        if (!(in >> input.time
+                 >> w
+                 >> a
+                 >> s
+                 >> d
+                 >> jump
+                 >> dash
+                 >> slide
+                 >> slash
+                 >> isDashing
+                 >> isWallRunning
+                 >> input.dashCooldown
+                 >> input.dashVisualTimer)) {
+            error = "bad manual input frame";
+            return false;
+        }
+
+        input.w = w != 0;
+        input.a = a != 0;
+        input.s = s != 0;
+        input.d = d != 0;
+        input.jump = jump != 0;
+        input.dash = dash != 0;
+        input.slide = slide != 0;
+        input.slash = slash != 0;
+        input.isDashing = isDashing != 0;
+        input.isWallRunning = isWallRunning != 0;
+    }
+
+    return true;
+}
+
+bool ReadRecentEpisodes(std::istream& in, std::vector<RLEpisodeSummary>& episodes, std::string& error) {
+    if (!ReadExpected(in, "recent_episodes", error)) return false;
+
+    int count = 0;
+    if (!(in >> count) || count < 0 || count > 1000) {
+        error = "bad recent episode count";
+        return false;
+    }
+
+    episodes.assign(count, {});
+    for (RLEpisodeSummary& episode : episodes) {
+        int success = 0;
+        int timeout = 0;
+        int stuck = 0;
+        int actionCount = 0;
+        if (!(in >> episode.episode
+                >> episode.time
+                >> episode.reward
+                >> episode.distanceToGoal
+                >> episode.collisionCost
+                >> episode.wallHits
+                >> episode.decisions
+                >> success
+                >> timeout
+                >> stuck
+                >> actionCount) ||
+            actionCount < 0 ||
+            actionCount > 128) {
+            error = "bad recent episode row";
+            return false;
+        }
+
+        episode.success = success != 0;
+        episode.timeout = timeout != 0;
+        episode.stuck = stuck != 0;
+        episode.actionCounts.assign(actionCount, 0);
+        for (int& value : episode.actionCounts) {
+            if (!(in >> value)) {
+                error = "bad recent episode action count";
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool ValidateLoadedRunner(RLRunner& runner, std::string& error) {
+    int actionCount = (int)RLActions().size();
+    int expectedFeatureCount = runner.model.EncodedFeatureCount(runner.model.rawFeatureCount);
+    int expectedWeightsPerAction = expectedFeatureCount + 1;
+
+    if (runner.model.rawFeatureCount != Player::RL_STATE_SIZE) {
+        error = "feature size mismatch; saved model does not match this build";
+        return false;
+    }
+    if (runner.model.featureCount != expectedFeatureCount) {
+        error = "encoded feature size mismatch; saved model does not match this build";
+        return false;
+    }
+    if ((int)runner.model.weights.size() != actionCount) {
+        error = "action count mismatch; saved model does not match this build";
+        return false;
+    }
+    for (const auto& row : runner.model.weights) {
+        if ((int)row.size() != expectedWeightsPerAction) {
+            error = "weight row size mismatch; saved model does not match this build";
+            return false;
+        }
+    }
+    if ((int)runner.model.actionBias.size() != actionCount) {
+        error = "action bias count mismatch; saved model does not match this build";
+        return false;
+    }
+    if ((int)runner.model.explorationWeight.size() != actionCount) {
+        error = "exploration weight count mismatch; saved model does not match this build";
+        return false;
+    }
+
+    if ((int)runner.lifetimeActionCounts.size() != actionCount) {
+        runner.lifetimeActionCounts.assign(actionCount, 0);
+    }
+    runner.EnsureActionTelemetry();
+
+    if (runner.bestPolicy.valid && !runner.model.CanUsePolicySnapshot(runner.bestPolicy)) {
+        runner.bestPolicy.valid = false;
+    }
+
+    runner.episode = std::max(0, runner.episode);
+    runner.successes = std::max(0, runner.successes);
+    runner.timeouts = std::max(0, runner.timeouts);
+    runner.stucks = std::max(0, runner.stucks);
+    runner.episodesSinceBest = std::max(0, runner.episodesSinceBest);
+    runner.bestTime = runner.HasBestRun() ? runner.bestTime : 9999.0f;
+    runner.bestReward = fmaxf(runner.bestReward, -9999.0f);
+    runner.bestSuccessReward = runner.HasBestRun() ? runner.bestSuccessReward : -9999.0f;
+    runner.model.EnsureActionTuning();
+    return true;
+}
+
+void SeedLoadedRunnerReplay(RLRunner& runner) {
+    runner.model.memory.clear();
+    runner.model.eliteMemory.clear();
+    runner.model.memoryCursor = 0;
+    runner.model.eliteMemoryCursor = 0;
+
+    for (const RLExperience& experience : runner.bestExperiences) {
+        runner.model.RememberExperience(experience);
+        runner.model.RememberEliteExperience(experience);
+    }
+
+    runner.trail.clear();
+    runner.episodeTrail.clear();
+    runner.episodeFrames.clear();
+    runner.episodeExperiences.clear();
+    runner.hasCurrentState = false;
+    runner.resetTimer = 0.0f;
+}
+
+bool WriteRunnerModel(std::ofstream& out, const RLRunner& runner) {
+    out << std::fixed << std::setprecision(9);
+    out << RL_MODEL_MAGIC << "\n";
+    out << "saved_at " << std::quoted(TimestampForModelText()) << "\n";
+    out << "name " << std::quoted(runner.model.name) << "\n";
+    out << "color "
+        << (int)runner.model.color.r << " "
+        << (int)runner.model.color.g << " "
+        << (int)runner.model.color.b << " "
+        << (int)runner.model.color.a << "\n";
+    out << "decision_interval " << runner.decisionInterval << "\n";
+    out << "model_params "
+        << runner.model.learningRate << " "
+        << runner.model.discount << " "
+        << runner.model.epsilon << " "
+        << runner.model.minEpsilon << " "
+        << runner.model.epsilonDecay << " "
+        << runner.model.turnRate << " "
+        << runner.model.clearanceGuidance << " "
+        << runner.model.lastTD << " "
+        << runner.model.rawFeatureCount << " "
+        << runner.model.featureCount << " "
+        << runner.model.memoryCapacity << " "
+        << runner.model.eliteMemoryCapacity << " "
+        << runner.model.replayBatchSize << "\n";
+
+    WriteFloatMatrix(out, "weights", runner.model.weights);
+    WriteFloatVector(out, "action_bias", runner.model.actionBias);
+    WriteFloatVector(out, "exploration_weight", runner.model.explorationWeight);
+
+    out << "runner_stats "
+        << runner.episode << " "
+        << runner.successes << " "
+        << runner.timeouts << " "
+        << runner.stucks << " "
+        << runner.episodesSinceBest << " "
+        << runner.manualGuidanceReplays << " "
+        << runner.manualGuidanceExperiences << " "
+        << runner.bestRunRehearsals << " "
+        << runner.bestTime << " "
+        << runner.bestReward << " "
+        << runner.bestSuccessReward << " "
+        << runner.lastEpisodeReward << " "
+        << runner.lastEpisodeTime << " "
+        << runner.lastDistance << " "
+        << runner.totalBestPathReward << "\n";
+
+    WriteIntVector(out, "lifetime_action_counts", runner.lifetimeActionCounts);
+    WritePolicySnapshot(out, runner.bestPolicy);
+    WriteVector3List(out, "best_trail", runner.bestTrail);
+    WriteReplayFrames(out, "best_frames", runner.bestFrames);
+    WriteExperiences(out, "best_experiences", runner.bestExperiences);
+    WriteRecentEpisodes(out, runner.recentEpisodes);
+    out << "end\n";
+
+    return out.good();
+}
+
+bool SaveRunnerModelToFile(const std::string& path, const RLRunner& runner, std::string& error) {
+    std::error_code ec;
+    fs::path outputPath(path);
+    fs::create_directories(outputPath.parent_path(), ec);
+    if (ec) {
+        error = "could not create model folder: " + ec.message();
+        return false;
+    }
+
+    std::string tempPath = path + ".tmp";
+    std::ofstream out(tempPath);
+    if (!out.is_open()) {
+        error = "could not open " + tempPath;
+        return false;
+    }
+
+    if (!WriteRunnerModel(out, runner)) {
+        error = "could not write " + tempPath;
+        return false;
+    }
+
+    out.close();
+    if (!out.good()) {
+        error = "could not finish writing " + tempPath;
+        return false;
+    }
+
+    fs::remove(outputPath, ec);
+    ec.clear();
+    fs::rename(tempPath, outputPath, ec);
+    if (ec) {
+        error = "could not replace " + path + ": " + ec.message();
+        return false;
+    }
+
+    return true;
+}
+
+bool LoadRunnerModelFromFile(const std::string& path, RLRunner& runner, std::string& error) {
+    std::ifstream in(path);
+    if (!in.is_open()) {
+        error = "could not open " + path;
+        return false;
+    }
+
+    std::string magic;
+    if (!(in >> magic) || magic != RL_MODEL_MAGIC) {
+        error = "not an RL model file: " + FileNameOnly(path);
+        return false;
+    }
+
+    RLRunner loaded = runner;
+    std::string savedAt;
+
+    if (!ReadExpected(in, "saved_at", error) || !(in >> std::quoted(savedAt))) return false;
+    if (!ReadExpected(in, "name", error) || !(in >> std::quoted(loaded.model.name))) return false;
+
+    int r = 255;
+    int g = 255;
+    int b = 255;
+    int a = 255;
+    if (!ReadExpected(in, "color", error) || !(in >> r >> g >> b >> a)) return false;
+    loaded.model.color = {
+        (unsigned char)Clamp((float)r, 0.0f, 255.0f),
+        (unsigned char)Clamp((float)g, 0.0f, 255.0f),
+        (unsigned char)Clamp((float)b, 0.0f, 255.0f),
+        (unsigned char)Clamp((float)a, 0.0f, 255.0f)
+    };
+
+    if (!ReadExpected(in, "decision_interval", error) || !(in >> loaded.decisionInterval)) return false;
+    if (!ReadExpected(in, "model_params", error) ||
+        !(in >> loaded.model.learningRate
+              >> loaded.model.discount
+              >> loaded.model.epsilon
+              >> loaded.model.minEpsilon
+              >> loaded.model.epsilonDecay
+              >> loaded.model.turnRate
+              >> loaded.model.clearanceGuidance
+              >> loaded.model.lastTD
+              >> loaded.model.rawFeatureCount
+              >> loaded.model.featureCount
+              >> loaded.model.memoryCapacity
+              >> loaded.model.eliteMemoryCapacity
+              >> loaded.model.replayBatchSize)) {
+        error = "bad model_params";
+        return false;
+    }
+
+    if (!ReadFloatMatrix(in, "weights", loaded.model.weights, 128, 1024, error)) return false;
+    if (!ReadFloatVector(in, "action_bias", loaded.model.actionBias, 128, error)) return false;
+    if (!ReadFloatVector(in, "exploration_weight", loaded.model.explorationWeight, 128, error)) return false;
+
+    if (!ReadExpected(in, "runner_stats", error) ||
+        !(in >> loaded.episode
+              >> loaded.successes
+              >> loaded.timeouts
+              >> loaded.stucks
+              >> loaded.episodesSinceBest
+              >> loaded.manualGuidanceReplays
+              >> loaded.manualGuidanceExperiences
+              >> loaded.bestRunRehearsals
+              >> loaded.bestTime
+              >> loaded.bestReward
+              >> loaded.bestSuccessReward
+              >> loaded.lastEpisodeReward
+              >> loaded.lastEpisodeTime
+              >> loaded.lastDistance
+              >> loaded.totalBestPathReward)) {
+        error = "bad runner_stats";
+        return false;
+    }
+
+    if (!ReadIntVector(in, "lifetime_action_counts", loaded.lifetimeActionCounts, 128, error)) return false;
+    if (!ReadPolicySnapshot(in, loaded.bestPolicy, error)) return false;
+    if (!ReadVector3List(in, "best_trail", loaded.bestTrail, 5000, error)) return false;
+    if (!ReadReplayFrames(in, "best_frames", loaded.bestFrames, 8000, error)) return false;
+    if (!ReadExperiences(in, "best_experiences", loaded.bestExperiences, 12000, error)) return false;
+    if (!ReadRecentEpisodes(in, loaded.recentEpisodes, error)) return false;
+    if (!ReadExpected(in, "end", error)) return false;
+
+    if (!ValidateLoadedRunner(loaded, error)) {
+        error = FileNameOnly(path) + ": " + error;
+        return false;
+    }
+
+    SeedLoadedRunnerReplay(loaded);
+    runner = loaded;
+    return true;
+}
+
+void TrainerPersistenceCounters(const RLTrainer& trainer, int& started, int& finished, int& bestFrames, int& manualGuidance) {
+    started = 0;
+    finished = 0;
+    bestFrames = 0;
+    manualGuidance = 0;
+
+    for (const RLRunner& runner : trainer.runners) {
+        started += runner.episode;
+        finished += runner.successes + runner.timeouts + runner.stucks;
+        bestFrames += (int)runner.bestFrames.size();
+        manualGuidance += runner.manualGuidanceExperiences + runner.manualGuidanceReplays;
+    }
+}
+
+void CapturePersistenceState(const RLTrainer& trainer, RLPersistenceState& state) {
+    TrainerPersistenceCounters(
+        trainer,
+        state.savedStartedEpisodes,
+        state.savedFinishedEpisodes,
+        state.savedBestFrameCount,
+        state.savedManualGuidance
+    );
+}
+
+bool TrainerChangedSinceAutosave(const RLTrainer& trainer, const RLPersistenceState& state) {
+    int started = 0;
+    int finished = 0;
+    int bestFrames = 0;
+    int manualGuidance = 0;
+    TrainerPersistenceCounters(trainer, started, finished, bestFrames, manualGuidance);
+
+    return started != state.savedStartedEpisodes ||
+           finished != state.savedFinishedEpisodes ||
+           bestFrames != state.savedBestFrameCount ||
+           manualGuidance != state.savedManualGuidance;
+}
+
+int SaveTrainerAutosaves(const RLTrainer& trainer, std::string& error) {
+    std::string directoryError;
+    if (!EnsureModelDirectory(directoryError)) {
+        error = directoryError;
+        return 0;
+    }
+
+    int saved = 0;
+    for (const RLRunner& runner : trainer.runners) {
+        std::string saveError;
+        if (SaveRunnerModelToFile(RunnerAutosavePath(runner), runner, saveError)) {
+            saved += 1;
+        } else if (error.empty()) {
+            error = saveError;
+        }
+    }
+
+    return saved;
+}
+
+int LoadTrainerAutosaves(RLTrainer& trainer, std::string& error) {
+    int loaded = 0;
+    for (RLRunner& runner : trainer.runners) {
+        std::string path = RunnerAutosavePath(runner);
+        std::error_code ec;
+        if (!fs::exists(path, ec)) continue;
+
+        std::string loadError;
+        if (LoadRunnerModelFromFile(path, runner, loadError)) {
+            loaded += 1;
+        } else if (error.empty()) {
+            error = loadError;
+        }
+    }
+
+    return loaded;
+}
+
+void AutoSaveTrainerModels(const RLTrainer& trainer, float dt, RLPersistenceState& persistence, RLModelLibrary& library) {
+    persistence.autosaveTimer += dt;
+    if (persistence.autosaveTimer < RL_AUTOSAVE_INTERVAL || !TrainerChangedSinceAutosave(trainer, persistence)) {
+        return;
+    }
+
+    std::string error;
+    int saved = SaveTrainerAutosaves(trainer, error);
+    persistence.autosaveTimer = 0.0f;
+
+    if (saved > 0) {
+        CapturePersistenceState(trainer, persistence);
+        RefreshModelLibrary(library);
+        SetModelLibraryStatus(library, "AUTOSAVED " + std::to_string(saved) + " MODELS");
+    } else {
+        SetModelLibraryStatus(library, "AUTOSAVE FAILED: " + error);
+    }
+}
+
+bool SaveSelectedModelSnapshot(const RLTrainer& trainer, RLModelLibrary& library, std::string& message) {
+    if (trainer.runners.empty()) {
+        message = "SNAPSHOT FAILED: no active model";
+        SetModelLibraryStatus(library, message);
+        return false;
+    }
+
+    const RLRunner& runner = trainer.ActiveRunner();
+    std::string path = RunnerSnapshotPath(runner);
+    std::string error;
+    if (!SaveRunnerModelToFile(path, runner, error)) {
+        message = "SNAPSHOT FAILED: " + error;
+        SetModelLibraryStatus(library, message);
+        return false;
+    }
+
+    RefreshModelLibrary(library);
+    for (int i = 0; i < (int)library.files.size(); ++i) {
+        if (library.files[i] == path) {
+            library.selectedFile = i;
+            break;
+        }
+    }
+
+    message = "SNAPSHOT SAVED: " + FileNameOnly(path);
+    SetModelLibraryStatus(library, message);
+    return true;
+}
+
+bool LoadSelectedModelFile(RLTrainer& trainer, const std::vector<Box>& obstacles, RLModelLibrary& library, RLPersistenceState& persistence, std::string& message) {
+    RefreshModelLibrary(library);
+    if (!library.HasFiles()) {
+        message = "LOAD FAILED: no model files in rl_models/";
+        SetModelLibraryStatus(library, message);
+        return false;
+    }
+
+    std::string path = library.SelectedPath();
+    std::string error;
+    RLRunner& runner = trainer.ActiveRunner();
+    if (!LoadRunnerModelFromFile(path, runner, error)) {
+        message = "LOAD FAILED: " + error;
+        SetModelLibraryStatus(library, message);
+        return false;
+    }
+
+    runner.StartEpisode(trainer.start, trainer.goal, obstacles);
+    CapturePersistenceState(trainer, persistence);
+    message = "LOADED: " + FileNameOnly(path);
+    SetModelLibraryStatus(library, message);
+    return true;
+}
+
+std::string ManualRunLabel(float finishTime, const std::string& fileName) {
+    std::ostringstream text;
+    text << std::fixed << std::setprecision(2) << finishTime << "s";
+    if (!fileName.empty()) text << "  " << fileName;
+    return text.str();
+}
+
+std::string ManualRunSavePath(const ManualRunReplay& replay) {
+    int centiseconds = (int)roundf(replay.finishTime * 100.0f);
+    std::ostringstream name;
+    name << "manual_"
+         << std::setw(5) << std::setfill('0') << centiseconds
+         << "_" << TimestampForModelFile()
+         << MANUAL_RUN_EXTENSION;
+    return (fs::path(MANUAL_RUN_DIRECTORY) / name.str()).string();
+}
+
+bool EnsureManualRunDirectory(std::string& error) {
+    std::error_code ec;
+    fs::path directory(MANUAL_RUN_DIRECTORY);
+    if (fs::exists(directory, ec)) {
+        if (fs::is_directory(directory, ec)) return true;
+        error = std::string(MANUAL_RUN_DIRECTORY) + " exists but is not a directory";
+        return false;
+    }
+
+    if (!fs::create_directories(directory, ec) || ec) {
+        error = "could not create " + std::string(MANUAL_RUN_DIRECTORY) + ": " + ec.message();
+        return false;
+    }
+
+    return true;
+}
+
+bool WriteManualRunToFile(const std::string& path, const ManualRunReplay& replay, std::string& error) {
+    if (!replay.HasRun()) {
+        error = "manual run is not finished";
+        return false;
+    }
+
+    std::error_code ec;
+    fs::path outputPath(path);
+    fs::create_directories(outputPath.parent_path(), ec);
+    if (ec) {
+        error = "could not create manual run folder: " + ec.message();
+        return false;
+    }
+
+    std::string tempPath = path + ".tmp";
+    std::ofstream out(tempPath);
+    if (!out.is_open()) {
+        error = "could not open " + tempPath;
+        return false;
+    }
+
+    out << std::fixed << std::setprecision(9);
+    out << MANUAL_RUN_MAGIC << "\n";
+    out << "saved_at " << std::quoted(TimestampForModelText()) << "\n";
+    out << "finish_time " << replay.finishTime << "\n";
+    WriteReplayFrames(out, "frames", replay.frames);
+    WriteVector3List(out, "trail", replay.trail);
+    WriteExperiences(out, "experiences", replay.experiences);
+    WriteManualInputs(out, replay.inputs);
+    out << "end\n";
+
+    out.close();
+    if (!out.good()) {
+        error = "could not finish writing " + tempPath;
+        return false;
+    }
+
+    fs::remove(outputPath, ec);
+    ec.clear();
+    fs::rename(tempPath, outputPath, ec);
+    if (ec) {
+        error = "could not replace " + path + ": " + ec.message();
+        return false;
+    }
+
+    return true;
+}
+
+bool ReadManualRunFromFile(const std::string& path, ManualRunReplay& replay, std::string& error) {
+    std::ifstream in(path);
+    if (!in.is_open()) {
+        error = "could not open " + path;
+        return false;
+    }
+
+    std::string magic;
+    if (!(in >> magic) || magic != MANUAL_RUN_MAGIC) {
+        error = "not a manual run file: " + FileNameOnly(path);
+        return false;
+    }
+
+    ManualRunReplay loaded;
+    std::string savedAt;
+    if (!ReadExpected(in, "saved_at", error) || !(in >> std::quoted(savedAt))) return false;
+    if (!ReadExpected(in, "finish_time", error) || !(in >> loaded.finishTime)) {
+        error = "bad finish_time";
+        return false;
+    }
+    if (!ReadReplayFrames(in, "frames", loaded.frames, 12000, error)) return false;
+    if (!ReadVector3List(in, "trail", loaded.trail, 8000, error)) return false;
+    if (!ReadExperiences(in, "experiences", loaded.experiences, 16000, error)) return false;
+
+    std::string token;
+    if (!(in >> token)) {
+        error = "missing token: inputs or end";
+        return false;
+    }
+    if (token == "inputs") {
+        if (!ReadManualInputsAfterLabel(in, loaded.inputs, 16000, error)) return false;
+        if (!ReadExpected(in, "end", error)) return false;
+    } else if (token != "end") {
+        error = "expected inputs or end, found " + token;
+        return false;
+    }
+
+    loaded.finished = !loaded.frames.empty() && !loaded.trail.empty() && loaded.finishTime > 0.0f;
+    loaded.savedToLibrary = true;
+    loaded.sourcePath = path;
+    loaded.label = ManualRunLabel(loaded.finishTime, FileNameOnly(path));
+    loaded.BackfillInputsFromReplayData();
+    if (!loaded.HasRun()) {
+        error = "manual run file has no complete replay data";
+        return false;
+    }
+
+    replay = loaded;
+    return true;
+}
+
+void SortManualRunLibrary(ManualRunLibrary& library) {
+    std::sort(library.runs.begin(), library.runs.end(), [](const ManualRunReplay& a, const ManualRunReplay& b) {
+        if (fabsf(a.finishTime - b.finishTime) > 0.001f) return a.finishTime < b.finishTime;
+        return FileNameOnly(a.sourcePath) < FileNameOnly(b.sourcePath);
+    });
+    if (!library.runs.empty()) {
+        library.selectedRun = std::max(0, std::min(library.selectedRun, (int)library.runs.size() - 1));
+    } else {
+        library.selectedRun = 0;
+    }
+}
+
+bool ManualRunQualifiesForTopSaves(const ManualRunLibrary& library, const ManualRunReplay& replay) {
+    if (!replay.HasRun()) return false;
+    if ((int)library.runs.size() < MANUAL_RUN_KEEP_COUNT) return true;
+
+    const ManualRunReplay& slowestSaved = library.runs.back();
+    return replay.finishTime < slowestSaved.finishTime - 0.001f;
+}
+
+void PruneManualRunLibrary(ManualRunLibrary& library) {
+    SortManualRunLibrary(library);
+
+    while ((int)library.runs.size() > MANUAL_RUN_KEEP_COUNT) {
+        ManualRunReplay removed = library.runs.back();
+        library.runs.pop_back();
+
+        if (!removed.sourcePath.empty()) {
+            std::error_code ec;
+            fs::remove(removed.sourcePath, ec);
+        }
+    }
+
+    SortManualRunLibrary(library);
+}
+
+void RefreshManualRunLibrary(ManualRunLibrary& library) {
+    std::string selectedPath = library.HasRuns() ? library.ActiveRun().sourcePath : "";
+    std::string directoryError;
+    if (!EnsureManualRunDirectory(directoryError)) {
+        library.status = "MANUAL RUN FOLDER FAILED: " + directoryError;
+        library.runs.clear();
+        library.selectedRun = 0;
+        return;
+    }
+
+    std::vector<ManualRunReplay> runs;
+    std::string firstError;
+    std::error_code ec;
+    fs::directory_iterator it(MANUAL_RUN_DIRECTORY, ec);
+    fs::directory_iterator end;
+
+    while (!ec && it != end) {
+        std::error_code entryError;
+        const fs::directory_entry& entry = *it;
+        if (entry.is_regular_file(entryError) && entry.path().extension() == MANUAL_RUN_EXTENSION) {
+            ManualRunReplay replay;
+            std::string loadError;
+            if (ReadManualRunFromFile(entry.path().string(), replay, loadError)) {
+                runs.push_back(replay);
+            } else if (firstError.empty()) {
+                firstError = loadError;
+            }
+        }
+        it.increment(ec);
+    }
+
+    library.runs = runs;
+    PruneManualRunLibrary(library);
+    library.selectedRun = 0;
+    for (int i = 0; i < (int)library.runs.size(); ++i) {
+        if (library.runs[i].sourcePath == selectedPath) {
+            library.selectedRun = i;
+            break;
+        }
+    }
+
+    if (!firstError.empty()) {
+        library.status = "MANUAL RUN LOAD FAILED: " + firstError;
+    } else if (library.HasRuns()) {
+        library.status = "LOADED TOP " + std::to_string(library.runs.size()) + " MANUAL RUNS";
+    } else {
+        library.status = "MANUAL RUN SAVES READY";
+    }
+}
+
+bool AddSavedManualRun(ManualRunLibrary& library, ManualRunReplay& replay, std::string& message) {
+    if (!replay.HasRun()) {
+        message = "MANUAL RUN SAVE FAILED: run is not complete";
+        library.status = message;
+        return false;
+    }
+
+    SortManualRunLibrary(library);
+    if (!ManualRunQualifiesForTopSaves(library, replay)) {
+        replay.savedToLibrary = true;
+        message = "MANUAL RUN NOT SAVED: top 2 are faster";
+        library.status = message;
+        return false;
+    }
+
+    std::string directoryError;
+    if (!EnsureManualRunDirectory(directoryError)) {
+        message = "MANUAL RUN SAVE FAILED: " + directoryError;
+        library.status = message;
+        return false;
+    }
+
+    std::string path = ManualRunSavePath(replay);
+    std::string error;
+    if (!WriteManualRunToFile(path, replay, error)) {
+        message = "MANUAL RUN SAVE FAILED: " + error;
+        library.status = message;
+        return false;
+    }
+
+    replay.savedToLibrary = true;
+    replay.sourcePath = path;
+    replay.label = ManualRunLabel(replay.finishTime, FileNameOnly(path));
+
+    library.runs.push_back(replay);
+    PruneManualRunLibrary(library);
+    library.selectedRun = 0;
+    for (int i = 0; i < (int)library.runs.size(); ++i) {
+        if (library.runs[i].sourcePath == path) {
+            library.selectedRun = i;
+            break;
+        }
+    }
+
+    message = "TOP 2 MANUAL RUN SAVED: " + FileNameOnly(path);
+    library.status = message;
+    return true;
+}
+
+void SelectPreviousManualRun(ManualRunLibrary& library) {
+    if (!library.HasRuns()) {
+        library.status = "NO SAVED MANUAL RUNS";
+        return;
+    }
+
+    library.selectedRun = (library.selectedRun - 1 + (int)library.runs.size()) % (int)library.runs.size();
+    library.status = "SELECTED MANUAL RUN: " + library.ActiveLabel();
+}
+
+void SelectNextManualRun(ManualRunLibrary& library) {
+    if (!library.HasRuns()) {
+        library.status = "NO SAVED MANUAL RUNS";
+        return;
+    }
+
+    library.selectedRun = (library.selectedRun + 1) % (int)library.runs.size();
+    library.status = "SELECTED MANUAL RUN: " + library.ActiveLabel();
+}
+
+ManualRunReplay BestManualRunFromLibrary(const ManualRunLibrary& library) {
+    if (!library.HasRuns()) return {};
+    return library.runs.front();
 }
 
 int main() {
@@ -1058,6 +2601,9 @@ int main() {
     Camera3D trainingCamera = MakeRLTrainingCamera();
     ManualRunReplay manualReplay;
     ManualRunReplay manualBestReplay;
+    ManualRunLibrary manualRunLibrary;
+    RLModelLibrary modelLibrary;
+    RLPersistenceState persistenceState;
 
     bool rlAutoplay = true;
     bool rlTrainingView = true;
@@ -1065,6 +2611,7 @@ int main() {
     bool turboTraining = false;
     bool soloTraining = false;
     bool manualRaceStarted = false;
+    bool manualRunView = false;
     bool uiCursorEnabled = false;
     int trainingSpeedIndex = 0;
     int trainingStepsLastFrame = 0;
@@ -1074,11 +2621,25 @@ int main() {
     float trainingActualSimWindow = 0.0f;
     float trainingActualWallWindow = 0.0f;
     float bestReplayTimer = 0.0f;
+    float manualRunReplayTimer = 0.0f;
     float reportFlashTimer = 0.0f;
     std::string reportMessage;
 
+    RefreshModelLibrary(modelLibrary);
+    RefreshManualRunLibrary(manualRunLibrary);
+    manualBestReplay = BestManualRunFromLibrary(manualRunLibrary);
+    std::string startupLoadError;
+    int loadedModels = LoadTrainerAutosaves(trainer, startupLoadError);
+    if (loadedModels > 0) {
+        SetModelLibraryStatus(modelLibrary, "LOADED " + std::to_string(loadedModels) + " AUTOSAVED MODELS");
+    } else if (!startupLoadError.empty()) {
+        SetModelLibraryStatus(modelLibrary, "LOAD FAILED: " + startupLoadError);
+    }
+
     player.ResetRL(world.startPoint, world.goalPoint);
     trainer.ResetEpisodes(world.obstacles);
+    CapturePersistenceState(trainer, persistenceState);
+    RefreshModelLibrary(modelLibrary);
 
     float spread = 0.0f;
 
@@ -1089,6 +2650,8 @@ int main() {
         if (IsKeyPressed(KEY_T)) {
             rlAutoplay = !rlAutoplay;
             katana.active = false;
+            manualRunView = false;
+            manualRunReplayTimer = 0.0f;
             if (!rlAutoplay) {
                 player.ResetRL(world.startPoint, world.goalPoint);
                 manualReplay.Reset();
@@ -1135,6 +2698,27 @@ int main() {
                 trainingPendingSimSeconds = 0.0f;
             }
             soloTraining = HandleSoloTrainingButton(soloTraining);
+
+            RLModelFileAction modelAction = HandleModelFileControls();
+            if (modelAction == RLModelFileAction::Previous) {
+                SelectPreviousModelFile(modelLibrary);
+            } else if (modelAction == RLModelFileAction::Next) {
+                SelectNextModelFile(modelLibrary);
+            } else if (modelAction == RLModelFileAction::Load) {
+                std::string modelMessage;
+                LoadSelectedModelFile(trainer, world.obstacles, modelLibrary, persistenceState, modelMessage);
+                reportMessage = modelMessage;
+                reportFlashTimer = 2.5f;
+                bestReplayTimer = 0.0f;
+                trainingPendingSimSeconds = 0.0f;
+                trainingActualSimWindow = 0.0f;
+                trainingActualWallWindow = 0.0f;
+            } else if (modelAction == RLModelFileAction::SaveSnapshot) {
+                std::string modelMessage;
+                SaveSelectedModelSnapshot(trainer, modelLibrary, modelMessage);
+                reportMessage = modelMessage;
+                reportFlashTimer = 2.5f;
+            }
         } else {
             bestRunView = false;
             turboTraining = false;
@@ -1149,9 +2733,13 @@ int main() {
                 trainingActualSimWindow = 0.0f;
                 trainingActualWallWindow = 0.0f;
             } else {
-                player.ResetRL(world.startPoint, world.goalPoint);
-                manualReplay.Reset();
-                manualRaceStarted = false;
+                if (manualRunView) {
+                    manualRunReplayTimer = 0.0f;
+                } else {
+                    player.ResetRL(world.startPoint, world.goalPoint);
+                    manualReplay.Reset();
+                    manualRaceStarted = false;
+                }
             }
         }
 
@@ -1181,6 +2769,47 @@ int main() {
             trainingActualSimWindow = 0.0f;
             trainingActualWallWindow = 0.0f;
 
+            if (IsKeyPressed(KEY_F)) {
+                if (manualRunLibrary.HasRuns()) {
+                    manualRunView = !manualRunView;
+                    manualRunReplayTimer = 0.0f;
+                    katana.active = false;
+                    hit.active = false;
+                    manualRunLibrary.status = manualRunView
+                        ? "VIEWING MANUAL RUN: " + manualRunLibrary.ActiveLabel()
+                        : "LIVE MANUAL MODE";
+                } else {
+                    manualRunView = false;
+                    manualRunLibrary.status = "NO SAVED MANUAL RUNS";
+                    reportMessage = "NO SAVED MANUAL RUNS";
+                    reportFlashTimer = 2.5f;
+                }
+            }
+
+            if (!manualRunView && manualRunLibrary.HasRuns()) {
+                if (IsKeyPressed(KEY_LEFT_BRACKET)) SelectPreviousManualRun(manualRunLibrary);
+                if (IsKeyPressed(KEY_RIGHT_BRACKET)) SelectNextManualRun(manualRunLibrary);
+            }
+
+            if (manualRunView && manualRunLibrary.HasRuns()) {
+                if (IsKeyPressed(KEY_LEFT_BRACKET)) {
+                    SelectPreviousManualRun(manualRunLibrary);
+                    manualRunReplayTimer = 0.0f;
+                }
+                if (IsKeyPressed(KEY_RIGHT_BRACKET)) {
+                    SelectNextManualRun(manualRunLibrary);
+                    manualRunReplayTimer = 0.0f;
+                }
+
+                const ManualRunReplay& replay = manualRunLibrary.ActiveRun();
+                manualRunReplayTimer += dt;
+                if (replay.finishTime > 0.001f) {
+                    while (manualRunReplayTimer > replay.finishTime) manualRunReplayTimer -= replay.finishTime;
+                }
+                katana.active = false;
+            } else {
+                manualRunView = false;
+
             if (IsKeyPressed(KEY_Q) && katana.cooldown <= 0.0f) {
                 katana.Trigger();
             }
@@ -1190,6 +2819,7 @@ int main() {
             bool manualS = IsKeyDown(KEY_S);
             bool manualD = IsKeyDown(KEY_D);
             bool manualJumpPressed = IsKeyPressed(KEY_SPACE);
+            bool manualJumpHeld = IsKeyDown(KEY_SPACE);
             bool manualDashPressed = IsKeyPressed(KEY_E);
             bool manualSlide = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_LEFT_SUPER) || IsKeyDown(KEY_C);
             bool manualStartInput =
@@ -1197,7 +2827,7 @@ int main() {
                 manualA ||
                 manualS ||
                 manualD ||
-                manualJumpPressed ||
+                manualJumpHeld ||
                 manualDashPressed ||
                 IsKeyDown(KEY_LEFT_SHIFT);
 
@@ -1243,11 +2873,39 @@ int main() {
                     manualReplay.Reset();
                 }
                 Player::RLState manualStateAfter = player.GetRLState(world.obstacles);
-                manualReplay.Record(player, manualStateBefore, manualAction, player.rlReward, manualStateAfter);
+                ManualInputFrame manualInput;
+                manualInput.w = manualW;
+                manualInput.a = manualA;
+                manualInput.s = manualS;
+                manualInput.d = manualD;
+                manualInput.jump = manualJumpHeld;
+                manualInput.dash = manualDashPressed || player.isDashing || player.dashVisualTimer > 0.0f;
+                manualInput.slide = manualSlide;
+                manualInput.slash = katana.active;
+                manualInput.isDashing = player.isDashing;
+                manualInput.isWallRunning = player.isWallRunning;
+                manualInput.dashCooldown = player.dashCooldown;
+                manualInput.dashVisualTimer = player.dashVisualTimer;
+                manualReplay.Record(player, manualStateBefore, manualAction, player.rlReward, manualStateAfter, manualInput);
+                if (manualReplay.HasRun() && !manualReplay.savedToLibrary) {
+                    std::string manualRunMessage;
+                    AddSavedManualRun(manualRunLibrary, manualReplay, manualRunMessage);
+                    reportMessage = manualRunMessage;
+                    reportFlashTimer = 2.5f;
+                }
                 if (manualReplay.IsBetterThan(manualBestReplay)) {
                     manualBestReplay = manualReplay;
                     trainer.LearnFromManualReplay(manualBestReplay.experiences, manualBestReplay.finishTime);
-                    reportMessage = TextFormat("MANUAL BEST FED TO AI: %.2fs", manualBestReplay.finishTime);
+                    std::string autosaveError;
+                    int saved = SaveTrainerAutosaves(trainer, autosaveError);
+                    if (saved > 0) {
+                        CapturePersistenceState(trainer, persistenceState);
+                        RefreshModelLibrary(modelLibrary);
+                        SetModelLibraryStatus(modelLibrary, "AUTOSAVED MANUAL GUIDANCE");
+                    } else {
+                        SetModelLibraryStatus(modelLibrary, "AUTOSAVE FAILED: " + autosaveError);
+                    }
+                    reportMessage = TextFormat("MANUAL BEST SAVED + FED TO AI: %.2fs", manualBestReplay.finishTime);
                     reportFlashTimer = 2.5f;
                 }
             }
@@ -1280,6 +2938,7 @@ int main() {
                     }
                 }
             }
+            }
         }
 
         if (IsKeyPressed(KEY_P)) {
@@ -1294,13 +2953,16 @@ int main() {
                 trainingSimSecondsLastFrame,
                 turboTraining,
                 soloTraining,
-                manualBestReplay
+                manualBestReplay,
+                manualRunLibrary
             );
             reportMessage = savedReport
                 ? "REPORT SAVED: rl_training_report.txt"
                 : "REPORT FAILED: rl_training_report.txt";
             reportFlashTimer = 2.5f;
         }
+
+        AutoSaveTrainerModels(trainer, dt, persistenceState, modelLibrary);
 
         if (reportFlashTimer > 0.0f) {
             reportFlashTimer = fmaxf(0.0f, reportFlashTimer - dt);
@@ -1312,6 +2974,16 @@ int main() {
         const Player& viewPlayer = rlAutoplay ? trainer.ActiveRunner().player : player;
         const RLRunner& activeRunner = trainer.ActiveRunner();
         bool bestRunCameraView = rlAutoplay && bestRunView && !rlTrainingView && activeRunner.HasBestRun();
+        bool manualRunCameraView = !rlAutoplay && manualRunView && manualRunLibrary.HasRuns();
+        ManualInputFrame manualReplayInput = manualRunCameraView
+            ? manualRunLibrary.ActiveRun().ManualInputAt(manualRunReplayTimer)
+            : ManualInputFrame();
+        bool dashActiveForUi = manualRunCameraView
+            ? (manualReplayInput.isDashing || manualReplayInput.dashVisualTimer > 0.0f)
+            : viewPlayer.isDashing;
+        bool wallRunningForUi = manualRunCameraView ? manualReplayInput.isWallRunning : viewPlayer.isWallRunning;
+        float dashCooldownForUi = manualRunCameraView ? manualReplayInput.dashCooldown : viewPlayer.dashCooldown;
+        float dashVisualTimerForUi = manualRunCameraView ? manualReplayInput.dashVisualTimer : viewPlayer.dashVisualTimer;
 
         if (bestRunCameraView) {
             bestReplayTimer += dt;
@@ -1323,11 +2995,13 @@ int main() {
             bestReplayTimer = 0.0f;
         }
 
-        Camera3D replayCamera = bestRunCameraView ? activeRunner.BestRunCamera(bestReplayTimer) : viewPlayer.camera;
+        Camera3D replayCamera = bestRunCameraView
+            ? activeRunner.BestRunCamera(bestReplayTimer)
+            : (manualRunCameraView ? manualRunLibrary.ActiveRun().FrameAt(manualRunReplayTimer).camera : viewPlayer.camera);
 
         float hSpeed = viewPlayer.GetHorizontalSpeed();
         float targetSpread = hSpeed * 1.35f + (!viewPlayer.onGround ? 12.0f : 0.0f);
-        if (viewPlayer.isDashing) targetSpread += 6.0f;
+        if (dashActiveForUi) targetSpread += 6.0f;
         if (!rlAutoplay && katana.active) targetSpread += 4.0f;
         spread = Lerp(spread, targetSpread, dt * 15.0f);
 
@@ -1352,7 +3026,7 @@ int main() {
                 } else {
                     BeginMode3D(replayCamera);
                         world.Draw(replayCamera);
-                        if (!rlAutoplay) {
+                        if (!rlAutoplay && !manualRunCameraView) {
                             float manualRaceTime = manualRaceStarted ? player.rlEpisodeTime : 0.0f;
                             DrawManualBestGhost(activeRunner, player.position, world.startPoint, manualRaceTime);
                             DrawManualCompletedGhost(manualBestReplay, player.position, manualRaceTime);
@@ -1382,14 +3056,14 @@ int main() {
 
             if (rlAutoplay && rlTrainingView) {
                 if (!skipWorldRender) DrawRLRunnerLabels(trainer, trainingCamera, bestRunView);
-                DrawRLTrainingOverlay(trainer, trainingSpeedIndex, trainingStepsLastFrame, trainingSimSecondsLastFrame, trainingPendingSimSeconds, trainingActualSpeedScale, bestRunView, turboTraining, soloTraining);
+                DrawRLTrainingOverlay(trainer, trainingSpeedIndex, trainingStepsLastFrame, trainingSimSecondsLastFrame, trainingPendingSimSeconds, trainingActualSpeedScale, bestRunView, turboTraining, soloTraining, modelLibrary);
             } else {
                 DrawCrosshair(cx, cy, spread);
                 if (!rlAutoplay && hit.active) DrawHitmarker(cx, cy, hit.timer, hit.maxTime);
             }
 
-            if ((!rlAutoplay || !rlTrainingView) && viewPlayer.dashVisualTimer > 0.0f) {
-                float a = viewPlayer.dashVisualTimer / DASH_TIME;
+            if ((!rlAutoplay || !rlTrainingView) && dashVisualTimerForUi > 0.0f) {
+                float a = dashVisualTimerForUi / DASH_TIME;
                 DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Fade(WHITE, a * 0.14f));
             }
 
@@ -1401,7 +3075,7 @@ int main() {
             if (!rlAutoplay || !rlTrainingView) {
                 DrawStatusBar(20, SCREEN_HEIGHT - 70, 300, 25, viewPlayer.health, MAX_HEALTH, RED, "HEALTH");
 
-                float dashStatus = 1.0f - Clamp(viewPlayer.dashCooldown / DASH_COOLDOWN_TIME, 0.0f, 1.0f);
+                float dashStatus = 1.0f - Clamp(dashCooldownForUi / DASH_COOLDOWN_TIME, 0.0f, 1.0f);
                 DrawStatusBar(
                     20,
                     SCREEN_HEIGHT - 40,
@@ -1409,11 +3083,12 @@ int main() {
                     20,
                     dashStatus,
                     1.0f,
-                    (viewPlayer.dashCooldown <= 0.0f ? GREEN : GOLD),
-                    rlAutoplay ? "DASH (RL)" : "DASH (E)"
+                    (dashCooldownForUi <= 0.0f ? GREEN : GOLD),
+                    manualRunCameraView ? "DASH (REPLAY)" : (rlAutoplay ? "DASH (RL)" : "DASH (E)")
                 );
 
-                DrawText(TextFormat("MODE: %s (T to toggle)", rlAutoplay ? "RL SELECTED RUNNER" : "MANUAL"), 20, 20, 20, rlAutoplay ? GREEN : LIGHTGRAY);
+                const char* modeLabel = rlAutoplay ? "RL SELECTED RUNNER" : (manualRunCameraView ? "MANUAL RUN REPLAY" : "MANUAL");
+                DrawText(TextFormat("MODE: %s (T to toggle)", modeLabel), 20, 20, 20, rlAutoplay ? GREEN : LIGHTGRAY);
                 DrawText(TextFormat("SPEED: %02.0f", hSpeed), 20, 46, 20, WHITE);
                 DrawText(TextFormat("RL STEP REWARD: %.3f", viewPlayer.rlReward), 20, 72, 20, YELLOW);
                 DrawText(TextFormat("EPISODE REWARD: %.3f", viewPlayer.rlEpisodeReward), 20, 98, 20, YELLOW);
@@ -1434,6 +3109,32 @@ int main() {
                         DrawText(TextFormat("MODEL: %s  ACTION: %s", active.model.name.c_str(), active.CurrentActionName()), 20, 202, 16, active.model.color);
                         DrawText("V = overview  TAB/arrows = select  R = reset runs", 20, 224, 16, LIGHTGRAY);
                     }
+                } else if (manualRunCameraView) {
+                    const ManualRunReplay& replay = manualRunLibrary.ActiveRun();
+                    DrawText(
+                        TextFormat("MANUAL RUN CAMERA: %d/%d  %.1f / %.1fs",
+                            manualRunLibrary.selectedRun + 1,
+                            (int)manualRunLibrary.runs.size(),
+                            manualRunReplayTimer,
+                            replay.finishTime),
+                        20,
+                        202,
+                        16,
+                        GOLD
+                    );
+                    std::string runName = TruncateTextToWidth(manualRunLibrary.ActiveLabel(), 520, 16);
+                    DrawText(runName.c_str(), 20, 224, 16, LIGHTGRAY);
+                    DrawText("F = live manual  [ ] = switch saved run  R = restart replay", 20, 246, 16, LIGHTGRAY);
+                    DrawText(TextFormat("FRAMES: %d  TRAIL: %d  SAMPLES: %d",
+                        (int)replay.frames.size(),
+                        (int)replay.trail.size(),
+                        (int)replay.experiences.size()),
+                        20,
+                        268,
+                        16,
+                        SKYBLUE
+                    );
+                    DrawManualInputOverlay(replay, world.goalPoint, manualRunReplayTimer);
                 } else {
                     DrawText("Manual: WASD + Mouse + Space + Shift + E + Q", 20, 202, 16, LIGHTGRAY);
                     if (activeRunner.HasBestRun()) {
@@ -1452,16 +3153,28 @@ int main() {
                         );
                         DrawText(manualRaceStarted ? "TAB/arrows = switch ghost  R = restart race" : "Race starts when you move", 20, 246, 16, manualRaceStarted ? LIGHTGRAY : GOLD);
                         if (manualBestReplay.HasRun()) {
-                            DrawText(TextFormat("YOUR BEST: %.1fs  yellow ghost saved", manualBestReplay.finishTime), 20, 268, 16, GOLD);
+                            DrawManualPlayerGhostStats(manualBestReplay, player.position, world.goalPoint, manualRaceTime, 20, 268);
+                        }
+                        if (manualRunLibrary.HasRuns()) {
+                            std::string manualRunText = TruncateTextToWidth("F replay POV  [ ] saved: " + manualRunLibrary.ActiveLabel(), 590, 16);
+                            DrawText(manualRunText.c_str(), 20, 290, 16, SKYBLUE);
                         }
                     } else {
                         DrawText(TextFormat("GHOST: %s has no best run yet", activeRunner.model.name.c_str()), 20, 224, 16, ORANGE);
                         DrawText("Train a successful run first, then switch back to manual", 20, 246, 16, LIGHTGRAY);
+                        if (manualBestReplay.HasRun()) {
+                            float manualRaceTime = manualRaceStarted ? player.rlEpisodeTime : 0.0f;
+                            DrawManualPlayerGhostStats(manualBestReplay, player.position, world.goalPoint, manualRaceTime, 20, 268);
+                        }
+                        if (manualRunLibrary.HasRuns()) {
+                            std::string manualRunText = TruncateTextToWidth("F replay POV  [ ] saved: " + manualRunLibrary.ActiveLabel(), 590, 16);
+                            DrawText(manualRunText.c_str(), 20, manualBestReplay.HasRun() ? 290 : 268, 16, SKYBLUE);
+                        }
                     }
                 }
 
-                if (viewPlayer.isWallRunning) DrawText("WALLRUNNING", cx - 60, cy + 60, 20, GREEN);
-                if (viewPlayer.isDashing) DrawText("DASH", cx - 25, cy + 84, 20, SKYBLUE);
+                if (wallRunningForUi) DrawText("WALLRUNNING", cx - 60, cy + 60, 20, GREEN);
+                if (dashActiveForUi) DrawText("DASH", cx - 25, cy + 84, 20, SKYBLUE);
                 if (!rlAutoplay && katana.active) DrawText("SLASH", cx - 28, cy + 108, 20, WHITE);
                 if (rlAutoplay) DrawText("RL CONTROL ACTIVE", cx - 82, cy + 132, 20, YELLOW);
 
@@ -1493,6 +3206,9 @@ int main() {
         EndDrawing();
     }
 
+    std::string finalAutosaveError;
+    SaveTrainerAutosaves(trainer, finalAutosaveError);
+
     WriteTrainingReport(
         "rl_training_report.txt",
         trainer,
@@ -1504,7 +3220,8 @@ int main() {
         trainingSimSecondsLastFrame,
         turboTraining,
         soloTraining,
-        manualBestReplay
+        manualBestReplay,
+        manualRunLibrary
     );
 
     UnloadShader(ppShader);

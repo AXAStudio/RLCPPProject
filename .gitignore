@@ -39,3 +39,11 @@
 
 # debug information files
 *.dwo
+
+# Runtime-trained RL model snapshots
+rl_models/*.rlmodel
+rl_models/*.rlmodel.tmp
+
+# Runtime-recorded manual run replays
+manual_runs/*.manualrun
+manual_runs/*.manualrun.tmp
