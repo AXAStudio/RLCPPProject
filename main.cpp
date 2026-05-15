@@ -12,6 +12,7 @@
 #include <system_error>
 #include <vector>
 #include <cmath>
+#include <cstdlib>
 #include "structs/Box.h"
 #include "structs/HitMarker.h"
 #include "structs/SlashParticle3D.h"
@@ -26,6 +27,8 @@ const char* RL_MODEL_DIRECTORY = "rl_models";
 const char* RL_MODEL_EXTENSION = ".rlmodel";
 const char* RL_MODEL_MAGIC = "RL_MODEL_V1";
 const float RL_AUTOSAVE_INTERVAL = 3.0f;
+const char* RL_TRAINING_REPORT_FILE = "rl_training_report.txt";
+const float RL_REPORT_AUTOSAVE_INTERVAL = 60.0f;
 const char* MANUAL_RUN_DIRECTORY = "manual_runs";
 const char* MANUAL_RUN_EXTENSION = ".manualrun";
 const char* MANUAL_RUN_MAGIC = "MANUAL_RUN_V1";
@@ -107,9 +110,100 @@ Camera3D MakeRLTrainingCamera() {
     return camera;
 }
 
+Camera3D MakeSpectatorRaceCamera(const Vector3& start, const Vector3& goal) {
+    Camera3D camera = {};
+    Vector3 center = Vector3Lerp(start, goal, 0.5f);
+    camera.position = { center.x - 24.0f, center.y + 22.0f, center.z + 34.0f };
+    camera.target = { center.x, center.y + 1.5f, center.z };
+    camera.up = { 0.0f, 1.0f, 0.0f };
+    camera.fovy = 58.0f;
+    camera.projection = CAMERA_PERSPECTIVE;
+    return camera;
+}
+
+void UpdateSpectatorFreeCamera(Camera3D& camera, float dt) {
+    Vector3 look = Vector3Subtract(camera.target, camera.position);
+    if (Vector3Length(look) <= 0.001f) look = { 0.0f, 0.0f, -1.0f };
+    Vector3 lookDir = Vector3Normalize(look);
+
+    float yaw = atan2f(lookDir.x, lookDir.z) * RAD2DEG;
+    float pitch = asinf(Clamp(lookDir.y, -1.0f, 1.0f)) * RAD2DEG;
+    Vector2 mouse = GetMouseDelta();
+    yaw -= mouse.x * MOUSE_SENSITIVITY;
+    pitch = Clamp(pitch - mouse.y * MOUSE_SENSITIVITY, -86.0f, 86.0f);
+
+    float yawRad = yaw * DEG2RAD;
+    float pitchRad = pitch * DEG2RAD;
+    Vector3 forward = {
+        sinf(yawRad) * cosf(pitchRad),
+        sinf(pitchRad),
+        cosf(yawRad) * cosf(pitchRad)
+    };
+    forward = Vector3Normalize(forward);
+
+    Vector3 flatForward = { forward.x, 0.0f, forward.z };
+    if (Vector3Length(flatForward) <= 0.001f) flatForward = { 0.0f, 0.0f, -1.0f };
+    flatForward = Vector3Normalize(flatForward);
+    Vector3 right = { -flatForward.z, 0.0f, flatForward.x };
+
+    Vector3 move = { 0.0f, 0.0f, 0.0f };
+    if (IsKeyDown(KEY_W)) move = Vector3Add(move, flatForward);
+    if (IsKeyDown(KEY_S)) move = Vector3Subtract(move, flatForward);
+    if (IsKeyDown(KEY_D)) move = Vector3Add(move, right);
+    if (IsKeyDown(KEY_A)) move = Vector3Subtract(move, right);
+    if (IsKeyDown(KEY_SPACE)) move.y += 1.0f;
+    if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_LEFT_SUPER)) move.y -= 1.0f;
+
+    if (Vector3Length(move) > 0.001f) {
+        float speed = IsKeyDown(KEY_LEFT_SHIFT) ? 42.0f : 18.0f;
+        Vector3 delta = Vector3Scale(Vector3Normalize(move), speed * dt);
+        camera.position = Vector3Add(camera.position, delta);
+    }
+
+    camera.target = Vector3Add(camera.position, forward);
+}
+
+void CameraLookAngles(const Camera3D& camera, float& yaw, float& pitch) {
+    Vector3 look = Vector3Subtract(camera.target, camera.position);
+    if (Vector3Length(look) <= 0.001f) look = { 0.0f, 0.0f, -1.0f };
+    look = Vector3Normalize(look);
+    yaw = atan2f(look.x, look.z) * RAD2DEG;
+    pitch = asinf(Clamp(look.y, -1.0f, 1.0f)) * RAD2DEG;
+}
+
+Vector3 DirectionFromLookAngles(float yaw, float pitch) {
+    float yawRad = yaw * DEG2RAD;
+    float pitchRad = pitch * DEG2RAD;
+    return Vector3Normalize({
+        sinf(yawRad) * cosf(pitchRad),
+        sinf(pitchRad),
+        cosf(yawRad) * cosf(pitchRad)
+    });
+}
+
+void UpdateSpectatorPovFreeLook(float& yaw, float& pitch) {
+    Vector2 mouse = GetMouseDelta();
+    yaw -= mouse.x * MOUSE_SENSITIVITY;
+    pitch = Clamp(pitch - mouse.y * MOUSE_SENSITIVITY, -86.0f, 86.0f);
+}
+
+Camera3D SpectatorPovFreeLookCamera(Camera3D baseCamera, float yaw, float pitch) {
+    baseCamera.target = Vector3Add(baseCamera.position, DirectionFromLookAngles(yaw, pitch));
+    baseCamera.up = { 0.0f, 1.0f, 0.0f };
+    return baseCamera;
+}
+
+const char* SpectatorRaceCameraModeName(int cameraMode) {
+    if (cameraMode == 1) return "PLAYER POV";
+    if (cameraMode == 2) return "AI POV";
+    return "FREECAM";
+}
+
 const int TRAINING_SPEED_OPTION_COUNT = 11;
 const float TRAINING_SPEED_OPTIONS[TRAINING_SPEED_OPTION_COUNT] = { 1.0f, 10.0f, 100.0f, 1000.0f, 2500.0f, 5000.0f, 10000.0f, 25000.0f, 50000.0f, 100000.0f, 250000.0f };
 const char* TRAINING_SPEED_LABELS[TRAINING_SPEED_OPTION_COUNT] = { "1x", "10x", "100x", "1000x", "2500x", "5000x", "10000x", "25000x", "50000x", "100000x", "250000x" };
+const int SPECTATOR_RACE_SPEED_OPTION_COUNT = 5;
+const float SPECTATOR_RACE_SPEED_OPTIONS[SPECTATOR_RACE_SPEED_OPTION_COUNT] = { 0.25f, 0.5f, 1.0f, 2.0f, 4.0f };
 
 struct RLModelLibrary {
     std::vector<std::string> files;
@@ -360,7 +454,7 @@ void DrawRLTrainingOverlay(
     DrawRectangleLines(12, 12, 390, 556, Fade(WHITE, 0.24f));
     DrawText(bestRunView ? "BEST RUN VIEW" : "RL TRAINING VIEW", 24, 24, 20, GREEN);
     DrawText("T manual  V camera  B best  H turbo  M solo", 24, 50, 14, LIGHTGRAY);
-    DrawText("TAB/arrows select  1-0/- speed  P report", 24, 68, 14, LIGHTGRAY);
+    DrawText("TAB/arrows select  1-0/- speed  P report (auto 60s)", 24, 68, 14, LIGHTGRAY);
     DrawText(TextFormat("ACTIVE: %s  ACTION: %s", active.model.name.c_str(), active.CurrentActionName()), 24, 76, 16, WHITE);
     DrawText(TextFormat("EPISODE: %d  TIME: %.1f / %.1f", active.episode, active.player.rlEpisodeTime, RL_MAX_EPISODE_TIME), 24, 104, 16, WHITE);
     DrawText(TextFormat("REWARD: %.2f  TD: %.2f  EPS: %.2f", active.player.rlEpisodeReward, active.model.lastTD, active.model.epsilon), 24, 128, 16, YELLOW);
@@ -466,7 +560,7 @@ void DrawRLTrainingOverlay(
             LIGHTGRAY
         );
 
-        const char* bestText = (runner.bestTime < 9998.0f) ? TextFormat("best %.1fs", runner.bestTime) : "best --";
+        const char* bestText = (runner.bestTime < 9998.0f) ? TextFormat("best %.2fs", runner.bestTime) : "best --";
         DrawText(bestText, panelX + 310, y, 14, GOLD);
         DrawText(TextFormat("%.1fm", runner.lastDistance), panelX + 310, y + 20, 14, SKYBLUE);
     }
@@ -591,6 +685,27 @@ struct ManualRunReplay {
         }
     }
 
+    void SeedStartFrame(
+        const Vector3& startPosition,
+        const Camera3D& startCamera,
+        int action,
+        const ManualInputFrame& input
+    ) {
+        if (!frames.empty() || !trail.empty() || !inputs.empty()) return;
+
+        frames.push_back({ startPosition, startCamera, 0.0f, action });
+        trail.push_back(startPosition);
+
+        ManualInputFrame startInput = input;
+        startInput.time = 0.0f;
+        startInput.isDashing = false;
+        startInput.isWallRunning = false;
+        startInput.dashCooldown = 0.0f;
+        startInput.dashVisualTimer = 0.0f;
+        inputs.push_back(startInput);
+        lastFrameTime = 0.0f;
+    }
+
     bool HasRun() const {
         return finished && !frames.empty() && !trail.empty();
     }
@@ -680,6 +795,8 @@ struct ManualRunLibrary {
     }
 };
 
+RLReplayFrame ManualRaceFrameAt(const ManualRunReplay& replay, float raceTime, const Vector3& start);
+
 int ClosestRLActionForManualInput(float relativeAngle, bool dash, bool jump, bool slide) {
     const std::vector<RLDiscreteAction>& actions = RLActions();
 
@@ -746,7 +863,7 @@ int InferManualRLAction(
     return ClosestRLActionForManualInput(relativeAngle, dash, jump, false);
 }
 
-void DrawManualCompletedGhost(const ManualRunReplay& replay, const Vector3& playerPosition, float replayTime) {
+void DrawManualCompletedGhost(const ManualRunReplay& replay, const Vector3& playerPosition, const Vector3& startPoint, float replayTime) {
     if (!replay.HasRun()) return;
 
     Color manualColor = { 255, 245, 180, 255 };
@@ -754,7 +871,7 @@ void DrawManualCompletedGhost(const ManualRunReplay& replay, const Vector3& play
         DrawLine3D(replay.trail[i - 1], replay.trail[i], Fade(manualColor, 0.45f));
     }
 
-    RLReplayFrame ghost = replay.FrameAt(replayTime);
+    RLReplayFrame ghost = ManualRaceFrameAt(replay, replayTime, startPoint);
     Vector3 p = ghost.position;
     if (RLHorizontalDistance(playerPosition, p) <= 0.1f) return;
 
@@ -766,6 +883,7 @@ void DrawManualCompletedGhost(const ManualRunReplay& replay, const Vector3& play
 void DrawManualPlayerGhostStats(
     const ManualRunReplay& replay,
     const Vector3& playerPosition,
+    const Vector3& startPoint,
     const Vector3& goalPoint,
     float replayTime,
     int x,
@@ -773,7 +891,7 @@ void DrawManualPlayerGhostStats(
 ) {
     if (!replay.HasRun()) return;
 
-    RLReplayFrame ghost = replay.FrameAt(replayTime);
+    RLReplayFrame ghost = ManualRaceFrameAt(replay, replayTime, startPoint);
     float playerDist = RLHorizontalDistance(playerPosition, goalPoint);
     float ghostDist = RLHorizontalDistance(ghost.position, goalPoint);
     float ghostLead = playerDist - ghostDist;
@@ -876,6 +994,262 @@ void DrawManualInputOverlay(const ManualRunReplay& replay, const Vector3& goalPo
     DrawText(TextFormat("CAM %.0f", lookPitch), (int)cx - 27, (int)cy + 31, 14, LIGHTGRAY);
 }
 
+float RaceCourseLength(const Vector3& start, const Vector3& goal) {
+    Vector3 delta = { goal.x - start.x, 0.0f, goal.z - start.z };
+    return fmaxf(0.001f, Vector3Length(delta));
+}
+
+float RaceCourseProgress01(const Vector3& position, const Vector3& start, const Vector3& goal) {
+    Vector3 delta = { goal.x - start.x, 0.0f, goal.z - start.z };
+    float length = fmaxf(0.001f, Vector3Length(delta));
+    Vector3 axis = Vector3Scale(delta, 1.0f / length);
+    Vector3 relative = { position.x - start.x, 0.0f, position.z - start.z };
+    return Clamp(Vector3DotProduct(relative, axis) / length, 0.0f, 1.0f);
+}
+
+Vector3 RaceCoursePointAt(const Vector3& start, const Vector3& goal, float progress01) {
+    Vector3 point = Vector3Lerp(start, goal, Clamp(progress01, 0.0f, 1.0f));
+    point.y = 0.32f;
+    return point;
+}
+
+Vector3 RaceCourseAxis(const Vector3& start, const Vector3& goal) {
+    Vector3 delta = { goal.x - start.x, 0.0f, goal.z - start.z };
+    if (Vector3Length(delta) <= 0.001f) return { 0.0f, 0.0f, -1.0f };
+    return Vector3Normalize(delta);
+}
+
+Vector3 RaceCourseSide(const Vector3& start, const Vector3& goal) {
+    Vector3 axis = RaceCourseAxis(start, goal);
+    return { -axis.z, 0.0f, axis.x };
+}
+
+float SpectatorRaceDuration(const ManualRunReplay& manualReplay, const RLRunner& aiRunner) {
+    float duration = 0.0f;
+    if (manualReplay.HasRun()) duration = fmaxf(duration, manualReplay.finishTime);
+    if (aiRunner.HasBestRun()) duration = fmaxf(duration, aiRunner.BestRunDuration());
+    return duration;
+}
+
+RLReplayFrame ManualRaceStartFrame(const ManualRunReplay& replay, const Vector3& start) {
+    RLReplayFrame first = replay.FrameAt(0.0f);
+    Vector3 cameraOffset = Vector3Subtract(first.camera.position, first.position);
+    Vector3 look = Vector3Subtract(first.camera.target, first.camera.position);
+    first.position = start;
+    first.camera.position = Vector3Add(start, cameraOffset);
+    first.camera.target = Vector3Add(first.camera.position, look);
+    first.time = 0.0f;
+    return first;
+}
+
+RLReplayFrame ManualRaceFrameAt(const ManualRunReplay& replay, float raceTime, const Vector3& start) {
+    if (!replay.HasRun()) return { start, {}, 0.0f, -1 };
+    const RLReplayFrame& firstSaved = replay.frames.front();
+    bool needsSyntheticStart = firstSaved.time > 0.001f || RLHorizontalDistance(firstSaved.position, start) > 0.02f;
+    if (!needsSyntheticStart) return replay.FrameAt(raceTime);
+
+    RLReplayFrame startFrame = ManualRaceStartFrame(replay, start);
+    if (raceTime <= 0.0f) return startFrame;
+    if (raceTime >= firstSaved.time) return replay.FrameAt(raceTime);
+
+    RLReplayFrame firstFrame = firstSaved;
+    float t = Clamp(raceTime / fmaxf(0.001f, firstSaved.time), 0.0f, 1.0f);
+    RLReplayFrame frame = firstFrame;
+    frame.position = Vector3Lerp(startFrame.position, firstFrame.position, t);
+    frame.camera.position = Vector3Lerp(startFrame.camera.position, firstFrame.camera.position, t);
+    frame.camera.target = Vector3Lerp(startFrame.camera.target, firstFrame.camera.target, t);
+    frame.camera.up = Vector3Normalize(Vector3Lerp(startFrame.camera.up, firstFrame.camera.up, t));
+    frame.camera.fovy = Lerp(startFrame.camera.fovy, firstFrame.camera.fovy, t);
+    frame.time = raceTime;
+    frame.action = (t < 0.5f) ? startFrame.action : firstFrame.action;
+    return frame;
+}
+
+void DrawRaceReplayTrail(const std::vector<Vector3>& trail, Color color, float alpha) {
+    for (int i = 1; i < (int)trail.size(); ++i) {
+        DrawLine3D(trail[i - 1], trail[i], Fade(color, alpha));
+    }
+}
+
+void DrawRaceActor(const RLReplayFrame& frame, Color color, bool highlighted) {
+    Vector3 p = frame.position;
+    DrawCube({ p.x, p.y + 0.35f, p.z }, 0.82f, 0.94f, 0.82f, Fade(color, 0.86f));
+    DrawCubeWires({ p.x, p.y + 0.35f, p.z }, 0.82f, 0.94f, 0.82f, WHITE);
+
+    Vector3 look = Vector3Subtract(frame.camera.target, frame.camera.position);
+    Vector3 forward = { look.x, 0.0f, look.z };
+    if (Vector3Length(forward) <= 0.001f) forward = { 0.0f, 0.0f, -1.0f };
+    forward = Vector3Normalize(forward);
+    DrawLine3D(
+        { p.x, p.y + 1.12f, p.z },
+        { p.x + forward.x * 1.7f, p.y + 1.12f, p.z + forward.z * 1.7f },
+        WHITE
+    );
+
+    if (highlighted) {
+        DrawSphere({ p.x, p.y + 1.28f, p.z }, 0.30f, WHITE);
+    }
+}
+
+void DrawRaceProgressRail3D(
+    const Vector3& start,
+    const Vector3& goal,
+    const Vector3& manualPosition,
+    const Vector3& aiPosition,
+    Color manualColor,
+    Color aiColor
+) {
+    Vector3 startFlat = { start.x, 0.30f, start.z };
+    Vector3 goalFlat = { goal.x, 0.30f, goal.z };
+    Vector3 side = RaceCourseSide(start, goal);
+
+    DrawLine3D(startFlat, goalFlat, Fade(WHITE, 0.55f));
+    for (int i = 0; i <= 10; ++i) {
+        float t = (float)i / 10.0f;
+        Vector3 tick = RaceCoursePointAt(start, goal, t);
+        DrawLine3D(
+            Vector3Subtract(tick, Vector3Scale(side, 0.75f)),
+            Vector3Add(tick, Vector3Scale(side, 0.75f)),
+            Fade(WHITE, i == 0 || i == 10 ? 0.75f : 0.34f)
+        );
+    }
+
+    float manualProgress = RaceCourseProgress01(manualPosition, start, goal);
+    float aiProgress = RaceCourseProgress01(aiPosition, start, goal);
+    Vector3 manualGate = RaceCoursePointAt(start, goal, manualProgress);
+    Vector3 aiGate = RaceCoursePointAt(start, goal, aiProgress);
+    const float gateHalfWidth = 48.0f;
+
+    manualGate.y = 10.8f;
+    aiGate.y = 9.8f;
+    DrawLine3D(
+        Vector3Subtract(manualGate, Vector3Scale(side, gateHalfWidth)),
+        Vector3Add(manualGate, Vector3Scale(side, gateHalfWidth)),
+        manualColor
+    );
+    DrawLine3D(
+        Vector3Subtract(aiGate, Vector3Scale(side, gateHalfWidth)),
+        Vector3Add(aiGate, Vector3Scale(side, gateHalfWidth)),
+        aiColor
+    );
+    DrawSphere(manualGate, 0.26f, manualColor);
+    DrawSphere(aiGate, 0.26f, aiColor);
+}
+
+void DrawSpectatorRace3D(
+    const ManualRunReplay& manualReplay,
+    const RLRunner& aiRunner,
+    float raceTime,
+    int cameraMode,
+    const Vector3& start,
+    const Vector3& goal
+) {
+    const Color manualColor = { 255, 224, 92, 255 };
+    bool hasManual = manualReplay.HasRun();
+    bool hasAi = aiRunner.HasBestRun();
+    if (!hasManual && !hasAi) return;
+
+    RLReplayFrame manualFrame = hasManual ? ManualRaceFrameAt(manualReplay, raceTime, start) : RLReplayFrame{ start, {}, 0.0f, -1 };
+    RLReplayFrame aiFrame = hasAi ? aiRunner.BestRunFrame(raceTime) : RLReplayFrame{ start, {}, 0.0f, -1 };
+
+    if (hasManual) DrawRaceReplayTrail(manualReplay.trail, manualColor, 0.42f);
+    if (hasAi) DrawRaceReplayTrail(aiRunner.bestTrail, aiRunner.model.color, 0.38f);
+
+    DrawRaceProgressRail3D(
+        start,
+        goal,
+        hasManual ? manualFrame.position : start,
+        hasAi ? aiFrame.position : start,
+        manualColor,
+        hasAi ? aiRunner.model.color : SKYBLUE
+    );
+
+    if (hasManual && cameraMode != 1) DrawRaceActor(manualFrame, manualColor, cameraMode == 2);
+    if (hasAi && cameraMode != 2) DrawRaceActor(aiFrame, aiRunner.model.color, cameraMode == 1);
+}
+
+void DrawSpectatorRaceOverlay(
+    const ManualRunReplay& manualReplay,
+    const RLRunner& aiRunner,
+    float raceTime,
+    bool raceRunning,
+    float playbackScale,
+    int cameraMode,
+    bool povFreeLook,
+    const Vector3& start,
+    const Vector3& goal
+) {
+    const Color manualColor = { 255, 224, 92, 255 };
+    bool hasManual = manualReplay.HasRun();
+    bool hasAi = aiRunner.HasBestRun();
+    float duration = SpectatorRaceDuration(manualReplay, aiRunner);
+    const char* playbackState = raceRunning
+        ? "PLAY"
+        : ((duration > 0.001f && raceTime >= duration - 0.001f) ? "FINISH" : (raceTime > 0.001f ? "PAUSED" : "READY"));
+
+    int panelHeight = hasManual && hasAi ? 164 : 144;
+    DrawRectangle(12, 12, 540, panelHeight, (Color){ 8, 10, 12, 210 });
+    DrawRectangleLines(12, 12, 540, panelHeight, Fade(WHITE, 0.24f));
+    DrawText("SPECTATOR RACE", 24, 24, 20, GOLD);
+    DrawText(
+        TextFormat("CAM: %s  %s  %.1f / %.1fs  %.2fx", SpectatorRaceCameraModeName(cameraMode), playbackState, raceTime, duration, playbackScale),
+        24,
+        50,
+        16,
+        WHITE
+    );
+    DrawText("G exit  R restart  ENTER play/pause  J/L scrub  ,/. speed", 24, 72, 14, LIGHTGRAY);
+    DrawText("C camera  TAB/arrows select AI", 24, 90, 14, LIGHTGRAY);
+    if (cameraMode == 0) DrawText("FREECAM: WASD + mouse  SPACE up  CTRL down  SHIFT fast", 24, 108, 14, SKYBLUE);
+    else DrawText(TextFormat("POV FREE LOOK: %s  F toggle", povFreeLook ? "ON" : "OFF"), 24, 108, 14, povFreeLook ? GREEN : SKYBLUE);
+
+    if (!hasManual || !hasAi) {
+        DrawText(
+            !hasManual ? "Need a saved manual best run first" : "Selected AI has no successful best run yet",
+            24,
+            126,
+            16,
+            ORANGE
+        );
+        return;
+    }
+
+    RLReplayFrame manualFrame = ManualRaceFrameAt(manualReplay, raceTime, start);
+    RLReplayFrame aiFrame = aiRunner.BestRunFrame(raceTime);
+    float courseLength = RaceCourseLength(start, goal);
+    float manualProgress = RaceCourseProgress01(manualFrame.position, start, goal);
+    float aiProgress = RaceCourseProgress01(aiFrame.position, start, goal);
+    float manualMeters = manualProgress * courseLength;
+    float aiMeters = aiProgress * courseLength;
+    float leadMeters = manualMeters - aiMeters;
+    const char* leader = leadMeters >= 0.0f ? "PLAYER GHOST" : "AI";
+
+    DrawText(TextFormat("PLAYER GHOST best %.2fs  course %.1fm", manualReplay.finishTime, manualMeters), 24, 126, 14, manualColor);
+    DrawText(TextFormat("AI %s best %.2fs  course %.1fm", aiRunner.model.name.c_str(), aiRunner.BestRunDuration(), aiMeters), 24, 144, 14, aiRunner.model.color);
+
+    int barX = 86;
+    int barY = SCREEN_HEIGHT - 84;
+    int barW = SCREEN_WIDTH - 172;
+    DrawRectangle(barX, barY, barW, 4, Fade(WHITE, 0.36f));
+    DrawText("START", barX - 56, barY - 8, 14, LIGHTGRAY);
+    DrawText("GOAL", barX + barW + 12, barY - 8, 14, LIGHTGRAY);
+
+    int manualX = barX + (int)(manualProgress * barW);
+    int aiX = barX + (int)(aiProgress * barW);
+    DrawRectangle(manualX - 2, barY - 30, 4, 64, manualColor);
+    DrawRectangle(aiX - 2, barY - 30, 4, 64, aiRunner.model.color);
+    DrawCircle(manualX, barY + 2, 5.0f, manualColor);
+    DrawCircle(aiX, barY + 2, 5.0f, aiRunner.model.color);
+    DrawText("PLAYER", manualX - 28, barY - 30, 13, manualColor);
+    DrawText("AI", aiX - 7, barY + 16, 13, aiRunner.model.color);
+
+    const char* leadText = TextFormat("%s ahead %.1fm", leader, fabsf(leadMeters));
+    int leadWidth = MeasureText(leadText, 18);
+    DrawRectangle(SCREEN_WIDTH / 2 - leadWidth / 2 - 12, barY - 48, leadWidth + 24, 30, (Color){ 8, 10, 12, 210 });
+    DrawRectangleLines(SCREEN_WIDTH / 2 - leadWidth / 2 - 12, barY - 48, leadWidth + 24, 30, Fade(WHITE, 0.22f));
+    DrawText(leadText, SCREEN_WIDTH / 2 - leadWidth / 2, barY - 42, 18, leadMeters >= 0.0f ? manualColor : aiRunner.model.color);
+}
+
 struct RLRecentStats {
     int count = 0;
     int successes = 0;
@@ -893,8 +1267,8 @@ struct RLRecentStats {
     std::vector<int> actionCounts;
 };
 
-int SumActionCounts(const std::vector<int>& counts) {
-    int total = 0;
+long long SumActionCounts(const std::vector<int>& counts) {
+    long long total = 0;
     for (int count : counts) total += count;
     return total;
 }
@@ -910,7 +1284,7 @@ int TopActionIndex(const std::vector<int>& counts) {
     return counts[best] > 0 ? best : -1;
 }
 
-float SafePercent(int part, int total) {
+float SafePercent(int part, long long total) {
     return total > 0 ? (100.0f * (float)part / (float)total) : 0.0f;
 }
 
@@ -934,9 +1308,9 @@ std::string FormatVector3(Vector3 value) {
 
 std::string ActionFlags(const RLDiscreteAction& action) {
     std::string flags;
-    if (action.dash) flags += "dash ";
-    if (action.jump) flags += "jump ";
-    if (action.slide) flags += "slide ";
+    if (action.dash) flags += flags.empty() ? "dash" : " dash";
+    if (action.jump) flags += flags.empty() ? "jump" : " jump";
+    if (action.slide) flags += flags.empty() ? "slide" : " slide";
     if (flags.empty()) flags = "move";
     return flags;
 }
@@ -976,7 +1350,7 @@ RLRecentStats BuildRecentStats(const RLRunner& runner, int maxEpisodes) {
 
 void WriteActionUsage(std::ofstream& out, const std::vector<int>& actionCounts) {
     const std::vector<RLDiscreteAction>& actions = RLActions();
-    int total = SumActionCounts(actionCounts);
+    long long total = SumActionCounts(actionCounts);
 
     out << "  total decisions: " << total << "\n";
     out << "  action table:\n";
@@ -1066,7 +1440,7 @@ void WriteModelRecommendations(
     float avgCollision = SafeAverage(stats.collisionTotal, stats.count);
     float avgDistance = SafeAverage(stats.distanceTotal, stats.count);
     float avgReward = SafeAverage(stats.rewardTotal, stats.count);
-    int recentDecisionTotal = SumActionCounts(stats.actionCounts);
+    long long recentDecisionTotal = SumActionCounts(stats.actionCounts);
     int topRecentAction = TopActionIndex(stats.actionCounts);
     float topRecentActionPct = topRecentAction >= 0 ? SafePercent(stats.actionCounts[topRecentAction], recentDecisionTotal) : 0.0f;
 
@@ -1136,7 +1510,7 @@ void WriteModelRecommendations(
 }
 
 bool WriteTrainingReport(
-    const char* path,
+    const std::string& path,
     const RLTrainer& trainer,
     const World& world,
     int speedIndex,
@@ -1147,10 +1521,25 @@ bool WriteTrainingReport(
     bool turboTraining,
     bool soloTraining,
     const ManualRunReplay& manualBestReplay,
-    const ManualRunLibrary& manualRunLibrary
+    const ManualRunLibrary& manualRunLibrary,
+    std::string* error = nullptr
 ) {
-    std::ofstream out(path);
-    if (!out.is_open()) return false;
+    std::error_code ec;
+    fs::path outputPath(path);
+    fs::path parentPath = outputPath.parent_path();
+    if (!parentPath.empty()) {
+        fs::create_directories(parentPath, ec);
+        if (ec) {
+            if (error) *error = "could not create report folder: " + ec.message();
+            return false;
+        }
+    }
+
+    std::ofstream out(path, std::ios::out | std::ios::trunc);
+    if (!out.is_open()) {
+        if (error) *error = "could not open " + path;
+        return false;
+    }
 
     std::time_t now = std::time(nullptr);
     float targetSpeedScale = TRAINING_SPEED_OPTIONS[speedIndex];
@@ -1306,6 +1695,11 @@ bool WriteTrainingReport(
         out << "  replay memory: " << runner.model.MemorySize() << " / " << runner.model.memoryCapacity << "\n";
         out << "  elite memory: " << runner.model.EliteMemorySize() << " / " << runner.model.eliteMemoryCapacity << "\n";
         out << "  manual guidance: " << runner.manualGuidanceReplays << " replays, " << runner.manualGuidanceExperiences << " samples\n";
+        if (!runner.manualGuidanceBest.empty()) {
+            out << "  manual guidance anchor: " << runner.manualGuidanceBest.size() << " samples, best "
+                << std::setprecision(3) << runner.manualGuidanceBestTime << "s, "
+                << runner.manualGuidanceRehearsals << " rehearsed updates\n";
+        }
         out << "  best-run anchor: " << runner.bestExperiences.size() << " samples, " << runner.bestRunRehearsals << " rehearsed updates\n";
         out << "  best-path reward: current episode " << runner.episodeBestPathReward << ", lifetime " << runner.totalBestPathReward << ", last step " << runner.lastBestPathReward << "\n";
         out << "  best policy saved: " << (runner.bestPolicy.valid ? "yes" : "no") << "\n";
@@ -1346,6 +1740,12 @@ bool WriteTrainingReport(
     out << "  - If bad-looking runs keep high reward, reduce shaping reward that can be farmed without finishing and make terminal success dominate the score.\n";
     out << "  - If 250000x reports only a few hundred actual x, the bottleneck is CPU simulation, not the rest of the computer. Keep the UI responsive by trusting actual speed and reducing active model work.\n";
     out << "  - Use this report after each tuning pass. Look for lower wall/collision averages, higher recent success rate, and a smaller gap between best run and average success time.\n";
+
+    out.close();
+    if (!out) {
+        if (error) *error = "write failed for " + path;
+        return false;
+    }
 
     return true;
 }
@@ -1394,27 +1794,260 @@ std::string FileNameOnly(const std::string& path) {
     return fs::path(path).filename().string();
 }
 
+bool IsMigrationBackupFile(const std::string& path) {
+    std::string fileName = FileNameOnly(path);
+    return fileName.find("_legacy_") != std::string::npos ||
+           fileName.find("_pre_migration_") != std::string::npos;
+}
+
+std::string AppOutputPath(const char* fileName) {
+    const char* appDirectory = GetApplicationDirectory();
+    if (appDirectory && appDirectory[0] != '\0') {
+        return (fs::path(appDirectory) / fileName).lexically_normal().string();
+    }
+    return fileName;
+}
+
+std::string ModelDirectoryPath() {
+    return AppOutputPath(RL_MODEL_DIRECTORY);
+}
+
+std::string ManualRunDirectoryPath() {
+    return AppOutputPath(MANUAL_RUN_DIRECTORY);
+}
+
+std::string TrainingReportPath() {
+    return AppOutputPath(RL_TRAINING_REPORT_FILE);
+}
+
+bool SameFilesystemLocation(const fs::path& a, const fs::path& b) {
+    std::error_code ec;
+    if (fs::exists(a, ec) && fs::exists(b, ec)) {
+        ec.clear();
+        if (fs::equivalent(a, b, ec) && !ec) return true;
+    }
+
+    std::error_code aEc;
+    std::error_code bEc;
+    fs::path canonicalA = fs::weakly_canonical(a, aEc);
+    fs::path canonicalB = fs::weakly_canonical(b, bEc);
+    if (!aEc && !bEc) return canonicalA == canonicalB;
+
+    return fs::absolute(a).lexically_normal() == fs::absolute(b).lexically_normal();
+}
+
+fs::path UniqueSiblingPath(const fs::path& path, const std::string& tag) {
+    fs::path directory = path.parent_path();
+    std::string stem = path.stem().string();
+    std::string extension = path.extension().string();
+    std::string timestamp = TimestampForModelFile();
+
+    for (int i = 0; i < 1000; ++i) {
+        std::ostringstream name;
+        name << stem << "_" << tag << "_" << timestamp;
+        if (i > 0) name << "_" << i;
+        name << extension;
+
+        fs::path candidate = directory / name.str();
+        std::error_code ec;
+        if (!fs::exists(candidate, ec)) return candidate;
+    }
+
+    return directory / (stem + "_" + tag + "_" + timestamp + extension);
+}
+
+int CopyPersistenceFilesFromDirectory(
+    const fs::path& sourceDirectory,
+    const fs::path& targetDirectory,
+    const std::string& extension,
+    std::string& firstError
+) {
+    std::error_code ec;
+    if (sourceDirectory.empty() ||
+        !fs::exists(sourceDirectory, ec) ||
+        !fs::is_directory(sourceDirectory, ec) ||
+        SameFilesystemLocation(sourceDirectory, targetDirectory)) {
+        return 0;
+    }
+
+    fs::create_directories(targetDirectory, ec);
+    if (ec) {
+        if (firstError.empty()) firstError = "could not create " + targetDirectory.string() + ": " + ec.message();
+        return 0;
+    }
+
+    int copied = 0;
+    fs::directory_iterator it(sourceDirectory, ec);
+    fs::directory_iterator end;
+    if (ec) {
+        if (firstError.empty()) firstError = "could not scan " + sourceDirectory.string() + ": " + ec.message();
+        return 0;
+    }
+
+    while (it != end) {
+        std::error_code entryError;
+        const fs::directory_entry& entry = *it;
+        if (entry.is_regular_file(entryError) && entry.path().extension() == extension) {
+            fs::path targetPath = targetDirectory / entry.path().filename();
+            bool targetExists = fs::exists(targetPath, entryError);
+            fs::path copyTarget = targetPath;
+
+            if (targetExists && !SameFilesystemLocation(entry.path(), targetPath)) {
+                std::error_code timeError;
+                auto sourceTime = fs::last_write_time(entry.path(), timeError);
+                auto targetTime = fs::last_write_time(targetPath, timeError);
+                bool sourceIsNewer = !timeError && sourceTime > targetTime;
+
+                if (sourceIsNewer) {
+                    fs::path backupPath = UniqueSiblingPath(targetPath, "pre_migration");
+                    std::error_code renameError;
+                    fs::rename(targetPath, backupPath, renameError);
+                    if (renameError) {
+                        copyTarget = UniqueSiblingPath(targetPath, "legacy");
+                    }
+                } else {
+                    copyTarget = UniqueSiblingPath(targetPath, "legacy");
+                }
+            }
+
+            std::error_code copyError;
+            fs::copy_file(
+                entry.path(),
+                copyTarget,
+                targetExists && copyTarget == targetPath ? fs::copy_options::overwrite_existing : fs::copy_options::none,
+                copyError
+            );
+
+            if (!copyError) {
+                copied += 1;
+            } else if (firstError.empty()) {
+                firstError = "could not migrate " + entry.path().string() + ": " + copyError.message();
+            }
+        }
+        it.increment(ec);
+        if (ec && firstError.empty()) {
+            firstError = "could not continue scanning " + sourceDirectory.string() + ": " + ec.message();
+        }
+    }
+
+    return copied;
+}
+
+int CopyReportIfNewer(const fs::path& sourcePath, const fs::path& targetPath, std::string& firstError) {
+    std::error_code ec;
+    if (sourcePath.empty() ||
+        !fs::exists(sourcePath, ec) ||
+        !fs::is_regular_file(sourcePath, ec) ||
+        SameFilesystemLocation(sourcePath, targetPath)) {
+        return 0;
+    }
+
+    fs::create_directories(targetPath.parent_path(), ec);
+    if (ec) {
+        if (firstError.empty()) firstError = "could not create report folder: " + ec.message();
+        return 0;
+    }
+
+    bool shouldCopy = !fs::exists(targetPath, ec);
+    if (!shouldCopy) {
+        std::error_code timeError;
+        auto sourceTime = fs::last_write_time(sourcePath, timeError);
+        auto targetTime = fs::last_write_time(targetPath, timeError);
+        shouldCopy = !timeError && sourceTime > targetTime;
+    }
+
+    if (!shouldCopy) return 0;
+
+    if (fs::exists(targetPath, ec)) {
+        fs::path backupPath = UniqueSiblingPath(targetPath, "pre_migration");
+        std::error_code renameError;
+        fs::rename(targetPath, backupPath, renameError);
+        if (renameError && firstError.empty()) {
+            firstError = "could not back up old report: " + renameError.message();
+            return 0;
+        }
+    }
+
+    std::error_code copyError;
+    fs::copy_file(sourcePath, targetPath, fs::copy_options::overwrite_existing, copyError);
+    if (copyError) {
+        if (firstError.empty()) firstError = "could not migrate report: " + copyError.message();
+        return 0;
+    }
+
+    return 1;
+}
+
+int MigrateLegacyPersistence(std::string& message) {
+    fs::path targetModels(ModelDirectoryPath());
+    fs::path targetManualRuns(ManualRunDirectoryPath());
+    fs::path targetReport(TrainingReportPath());
+
+    std::vector<fs::path> modelSources;
+    std::vector<fs::path> manualSources;
+    std::vector<fs::path> reportSources;
+
+    std::error_code ec;
+    fs::path cwd = fs::current_path(ec);
+    if (!ec) {
+        modelSources.push_back(cwd / RL_MODEL_DIRECTORY);
+        manualSources.push_back(cwd / MANUAL_RUN_DIRECTORY);
+        reportSources.push_back(cwd / RL_TRAINING_REPORT_FILE);
+    }
+
+    const char* home = std::getenv("HOME");
+    if (home && home[0] != '\0') {
+        fs::path homePath(home);
+        modelSources.push_back(homePath / RL_MODEL_DIRECTORY);
+        manualSources.push_back(homePath / MANUAL_RUN_DIRECTORY);
+        reportSources.push_back(homePath / RL_TRAINING_REPORT_FILE);
+    }
+
+    int copied = 0;
+    int reportCopied = 0;
+    std::string firstError;
+    for (const fs::path& source : modelSources) {
+        copied += CopyPersistenceFilesFromDirectory(source, targetModels, RL_MODEL_EXTENSION, firstError);
+    }
+    for (const fs::path& source : manualSources) {
+        copied += CopyPersistenceFilesFromDirectory(source, targetManualRuns, MANUAL_RUN_EXTENSION, firstError);
+    }
+    for (const fs::path& source : reportSources) {
+        reportCopied += CopyReportIfNewer(source, targetReport, firstError);
+    }
+
+    if (!firstError.empty()) {
+        message = "SAVE MIGRATION WARNING: " + firstError;
+    } else if (copied > 0 || reportCopied > 0) {
+        message = TextFormat("MIGRATED %d SAVE FILES + %d REPORTS", copied, reportCopied);
+    } else {
+        message.clear();
+    }
+
+    return copied + reportCopied;
+}
+
 std::string RunnerAutosavePath(const RLRunner& runner) {
-    fs::path path = fs::path(RL_MODEL_DIRECTORY) / ("autosave_" + ModelSlug(runner.model.name) + RL_MODEL_EXTENSION);
+    fs::path path = fs::path(ModelDirectoryPath()) / ("autosave_" + ModelSlug(runner.model.name) + RL_MODEL_EXTENSION);
     return path.string();
 }
 
 std::string RunnerSnapshotPath(const RLRunner& runner) {
-    fs::path path = fs::path(RL_MODEL_DIRECTORY) / (ModelSlug(runner.model.name) + "_" + TimestampForModelFile() + RL_MODEL_EXTENSION);
+    fs::path path = fs::path(ModelDirectoryPath()) / (ModelSlug(runner.model.name) + "_" + TimestampForModelFile() + RL_MODEL_EXTENSION);
     return path.string();
 }
 
 bool EnsureModelDirectory(std::string& error) {
     std::error_code ec;
-    fs::path directory(RL_MODEL_DIRECTORY);
+    fs::path directory(ModelDirectoryPath());
     if (fs::exists(directory, ec)) {
         if (fs::is_directory(directory, ec)) return true;
-        error = std::string(RL_MODEL_DIRECTORY) + " exists but is not a directory";
+        error = directory.string() + " exists but is not a directory";
         return false;
     }
 
     if (!fs::create_directories(directory, ec) || ec) {
-        error = "could not create " + std::string(RL_MODEL_DIRECTORY) + ": " + ec.message();
+        error = "could not create " + directory.string() + ": " + ec.message();
         return false;
     }
 
@@ -1437,13 +2070,15 @@ void RefreshModelLibrary(RLModelLibrary& library) {
     std::string previousSelection = library.SelectedPath();
     std::vector<std::string> files;
     std::error_code ec;
-    fs::directory_iterator it(RL_MODEL_DIRECTORY, ec);
+    fs::directory_iterator it(ModelDirectoryPath(), ec);
     fs::directory_iterator end;
 
     while (!ec && it != end) {
         std::error_code entryError;
         const fs::directory_entry& entry = *it;
-        if (entry.is_regular_file(entryError) && entry.path().extension() == RL_MODEL_EXTENSION) {
+        if (entry.is_regular_file(entryError) &&
+            entry.path().extension() == RL_MODEL_EXTENSION &&
+            !IsMigrationBackupFile(entry.path().string())) {
             files.push_back(entry.path().string());
         }
         it.increment(ec);
@@ -2305,20 +2940,20 @@ std::string ManualRunSavePath(const ManualRunReplay& replay) {
          << std::setw(5) << std::setfill('0') << centiseconds
          << "_" << TimestampForModelFile()
          << MANUAL_RUN_EXTENSION;
-    return (fs::path(MANUAL_RUN_DIRECTORY) / name.str()).string();
+    return (fs::path(ManualRunDirectoryPath()) / name.str()).string();
 }
 
 bool EnsureManualRunDirectory(std::string& error) {
     std::error_code ec;
-    fs::path directory(MANUAL_RUN_DIRECTORY);
+    fs::path directory(ManualRunDirectoryPath());
     if (fs::exists(directory, ec)) {
         if (fs::is_directory(directory, ec)) return true;
-        error = std::string(MANUAL_RUN_DIRECTORY) + " exists but is not a directory";
+        error = directory.string() + " exists but is not a directory";
         return false;
     }
 
     if (!fs::create_directories(directory, ec) || ec) {
-        error = "could not create " + std::string(MANUAL_RUN_DIRECTORY) + ": " + ec.message();
+        error = "could not create " + directory.string() + ": " + ec.message();
         return false;
     }
 
@@ -2473,13 +3108,15 @@ void RefreshManualRunLibrary(ManualRunLibrary& library) {
     std::vector<ManualRunReplay> runs;
     std::string firstError;
     std::error_code ec;
-    fs::directory_iterator it(MANUAL_RUN_DIRECTORY, ec);
+    fs::directory_iterator it(ManualRunDirectoryPath(), ec);
     fs::directory_iterator end;
 
     while (!ec && it != end) {
         std::error_code entryError;
         const fs::directory_entry& entry = *it;
-        if (entry.is_regular_file(entryError) && entry.path().extension() == MANUAL_RUN_EXTENSION) {
+        if (entry.is_regular_file(entryError) &&
+            entry.path().extension() == MANUAL_RUN_EXTENSION &&
+            !IsMigrationBackupFile(entry.path().string())) {
             ManualRunReplay replay;
             std::string loadError;
             if (ReadManualRunFromFile(entry.path().string(), replay, loadError)) {
@@ -2599,6 +3236,7 @@ int main() {
     World world;
     RLTrainer trainer(world.startPoint, world.goalPoint);
     Camera3D trainingCamera = MakeRLTrainingCamera();
+    Camera3D spectatorRaceCamera = MakeSpectatorRaceCamera(world.startPoint, world.goalPoint);
     ManualRunReplay manualReplay;
     ManualRunReplay manualBestReplay;
     ManualRunLibrary manualRunLibrary;
@@ -2612,7 +3250,12 @@ int main() {
     bool soloTraining = false;
     bool manualRaceStarted = false;
     bool manualRunView = false;
+    bool spectatorRaceView = false;
+    bool spectatorRaceRunning = false;
+    bool spectatorPovFreeLook = false;
     bool uiCursorEnabled = false;
+    int spectatorRaceCameraMode = 0;
+    int spectatorRaceSpeedIndex = 2;
     int trainingSpeedIndex = 0;
     int trainingStepsLastFrame = 0;
     float trainingSimSecondsLastFrame = 0.0f;
@@ -2622,8 +3265,15 @@ int main() {
     float trainingActualWallWindow = 0.0f;
     float bestReplayTimer = 0.0f;
     float manualRunReplayTimer = 0.0f;
+    float spectatorRaceTimer = 0.0f;
+    float spectatorPovYaw = 0.0f;
+    float spectatorPovPitch = 0.0f;
     float reportFlashTimer = 0.0f;
+    float reportAutosaveTimer = 0.0f;
     std::string reportMessage;
+
+    std::string startupMigrationMessage;
+    MigrateLegacyPersistence(startupMigrationMessage);
 
     RefreshModelLibrary(modelLibrary);
     RefreshManualRunLibrary(manualRunLibrary);
@@ -2636,12 +3286,49 @@ int main() {
         SetModelLibraryStatus(modelLibrary, "LOAD FAILED: " + startupLoadError);
     }
 
+    int seededManualRuns = 0;
+    for (const ManualRunReplay& savedRun : manualRunLibrary.runs) {
+        if (!savedRun.experiences.empty()) {
+            trainer.LearnFromManualReplay(savedRun.experiences, savedRun.finishTime);
+            seededManualRuns += 1;
+        }
+    }
+
     player.ResetRL(world.startPoint, world.goalPoint);
     trainer.ResetEpisodes(world.obstacles);
+    if (seededManualRuns > 0) {
+        std::string seedAutosaveError;
+        SaveTrainerAutosaves(trainer, seedAutosaveError);
+    }
     CapturePersistenceState(trainer, persistenceState);
     RefreshModelLibrary(modelLibrary);
+    if (!startupMigrationMessage.empty()) {
+        reportMessage = startupMigrationMessage;
+        reportFlashTimer = 4.0f;
+    } else if (seededManualRuns > 0) {
+        reportMessage = TextFormat("SEEDED AI FROM %d MANUAL RUNS", seededManualRuns);
+        reportFlashTimer = 3.0f;
+    }
 
     float spread = 0.0f;
+
+    auto writeCurrentTrainingReport = [&](std::string& error) {
+        return WriteTrainingReport(
+            TrainingReportPath(),
+            trainer,
+            world,
+            trainingSpeedIndex,
+            trainingActualSpeedScale,
+            trainingPendingSimSeconds,
+            trainingStepsLastFrame,
+            trainingSimSecondsLastFrame,
+            turboTraining,
+            soloTraining,
+            manualBestReplay,
+            manualRunLibrary,
+            &error
+        );
+    };
 
     while (!WindowShouldClose()) {
         SetTargetFPS((rlAutoplay && rlTrainingView) ? 120 : 144);
@@ -2651,7 +3338,11 @@ int main() {
             rlAutoplay = !rlAutoplay;
             katana.active = false;
             manualRunView = false;
+            spectatorRaceView = false;
+            spectatorRaceRunning = false;
+            spectatorPovFreeLook = false;
             manualRunReplayTimer = 0.0f;
+            spectatorRaceTimer = 0.0f;
             if (!rlAutoplay) {
                 player.ResetRL(world.startPoint, world.goalPoint);
                 manualReplay.Reset();
@@ -2733,7 +3424,11 @@ int main() {
                 trainingActualSimWindow = 0.0f;
                 trainingActualWallWindow = 0.0f;
             } else {
-                if (manualRunView) {
+                if (spectatorRaceView) {
+                    spectatorRaceTimer = 0.0f;
+                    spectatorRaceRunning = false;
+                    spectatorPovFreeLook = false;
+                } else if (manualRunView) {
                     manualRunReplayTimer = 0.0f;
                 } else {
                     player.ResetRL(world.startPoint, world.goalPoint);
@@ -2769,7 +3464,110 @@ int main() {
             trainingActualSimWindow = 0.0f;
             trainingActualWallWindow = 0.0f;
 
-            if (IsKeyPressed(KEY_F)) {
+            if (IsKeyPressed(KEY_G)) {
+                spectatorRaceView = !spectatorRaceView;
+                spectatorRaceRunning = false;
+                spectatorPovFreeLook = false;
+                spectatorRaceTimer = 0.0f;
+                manualRunView = false;
+                manualRunReplayTimer = 0.0f;
+                katana.active = false;
+                hit.active = false;
+                if (spectatorRaceView) {
+                    spectatorRaceCamera = MakeSpectatorRaceCamera(world.startPoint, world.goalPoint);
+                    spectatorRaceCameraMode = 0;
+                    spectatorRaceSpeedIndex = 2;
+                    reportMessage = "SPECTATOR RACE READY: ENTER TO PLAY";
+                } else {
+                    reportMessage = "SPECTATOR RACE OFF";
+                }
+                reportFlashTimer = 2.5f;
+            }
+
+            if (spectatorRaceView) {
+                manualRunView = false;
+                katana.active = false;
+                hit.active = false;
+                const RLRunner& raceRunner = trainer.ActiveRunner();
+                float raceDuration = SpectatorRaceDuration(manualBestReplay, raceRunner);
+                bool raceReady = manualBestReplay.HasRun() && raceRunner.HasBestRun() && raceDuration > 0.001f;
+
+                if (IsKeyPressed(KEY_ENTER)) {
+                    if (raceReady) {
+                        if (spectatorRaceTimer >= raceDuration - 0.001f) {
+                            spectatorRaceTimer = 0.0f;
+                        }
+                        spectatorRaceRunning = !spectatorRaceRunning;
+                    } else {
+                        reportMessage = "SPECTATOR RACE NEEDS MANUAL + AI BEST RUNS";
+                        reportFlashTimer = 2.5f;
+                    }
+                }
+
+                if (IsKeyPressed(KEY_C)) {
+                    spectatorRaceCameraMode = (spectatorRaceCameraMode + 1) % 3;
+                    spectatorPovFreeLook = false;
+                }
+
+                if (spectatorRaceCameraMode != 0 && IsKeyPressed(KEY_F)) {
+                    if (!spectatorPovFreeLook) {
+                        Camera3D basePovCamera = {};
+                        bool hasBasePovCamera = false;
+                        if (spectatorRaceCameraMode == 1 && manualBestReplay.HasRun()) {
+                            basePovCamera = ManualRaceFrameAt(manualBestReplay, spectatorRaceTimer, world.startPoint).camera;
+                            hasBasePovCamera = true;
+                        } else if (spectatorRaceCameraMode == 2 && raceRunner.HasBestRun()) {
+                            basePovCamera = raceRunner.BestRunCamera(spectatorRaceTimer);
+                            hasBasePovCamera = true;
+                        }
+
+                        if (hasBasePovCamera) {
+                            CameraLookAngles(basePovCamera, spectatorPovYaw, spectatorPovPitch);
+                            spectatorPovFreeLook = true;
+                        }
+                    } else {
+                        spectatorPovFreeLook = false;
+                    }
+                }
+
+                if (IsKeyPressed(KEY_COMMA)) {
+                    spectatorRaceSpeedIndex = std::max(0, spectatorRaceSpeedIndex - 1);
+                }
+                if (IsKeyPressed(KEY_PERIOD)) {
+                    spectatorRaceSpeedIndex = std::min(SPECTATOR_RACE_SPEED_OPTION_COUNT - 1, spectatorRaceSpeedIndex + 1);
+                }
+
+                float scrubSpeed = IsKeyDown(KEY_LEFT_SHIFT) ? 10.0f : 3.0f;
+                if (raceReady && IsKeyDown(KEY_J)) {
+                    spectatorRaceTimer -= dt * scrubSpeed;
+                    spectatorRaceRunning = false;
+                }
+                if (raceReady && IsKeyDown(KEY_L)) {
+                    spectatorRaceTimer += dt * scrubSpeed;
+                    spectatorRaceRunning = false;
+                }
+
+                if (raceReady && spectatorRaceRunning) {
+                    spectatorRaceTimer += dt * SPECTATOR_RACE_SPEED_OPTIONS[spectatorRaceSpeedIndex];
+                }
+
+                if (raceReady) {
+                    spectatorRaceTimer = Clamp(spectatorRaceTimer, 0.0f, raceDuration);
+                    if (spectatorRaceTimer >= raceDuration - 0.001f) spectatorRaceRunning = false;
+                } else {
+                    spectatorRaceTimer = 0.0f;
+                    spectatorRaceRunning = false;
+                }
+
+                if (spectatorRaceCameraMode == 0) {
+                    UpdateSpectatorFreeCamera(spectatorRaceCamera, dt);
+                    spectatorPovFreeLook = false;
+                } else if (spectatorPovFreeLook) {
+                    UpdateSpectatorPovFreeLook(spectatorPovYaw, spectatorPovPitch);
+                }
+            }
+
+            if (!spectatorRaceView && IsKeyPressed(KEY_F)) {
                 if (manualRunLibrary.HasRuns()) {
                     manualRunView = !manualRunView;
                     manualRunReplayTimer = 0.0f;
@@ -2786,12 +3584,12 @@ int main() {
                 }
             }
 
-            if (!manualRunView && manualRunLibrary.HasRuns()) {
+            if (!spectatorRaceView && !manualRunView && manualRunLibrary.HasRuns()) {
                 if (IsKeyPressed(KEY_LEFT_BRACKET)) SelectPreviousManualRun(manualRunLibrary);
                 if (IsKeyPressed(KEY_RIGHT_BRACKET)) SelectNextManualRun(manualRunLibrary);
             }
 
-            if (manualRunView && manualRunLibrary.HasRuns()) {
+            if (!spectatorRaceView && manualRunView && manualRunLibrary.HasRuns()) {
                 if (IsKeyPressed(KEY_LEFT_BRACKET)) {
                     SelectPreviousManualRun(manualRunLibrary);
                     manualRunReplayTimer = 0.0f;
@@ -2807,7 +3605,7 @@ int main() {
                     while (manualRunReplayTimer > replay.finishTime) manualRunReplayTimer -= replay.finishTime;
                 }
                 katana.active = false;
-            } else {
+            } else if (!spectatorRaceView) {
                 manualRunView = false;
 
             if (IsKeyPressed(KEY_Q) && katana.cooldown <= 0.0f) {
@@ -2836,6 +3634,8 @@ int main() {
             }
 
             float playerTimeBeforeUpdate = player.rlEpisodeTime;
+            Vector3 playerPositionBeforeUpdate = player.position;
+            Camera3D playerCameraBeforeUpdate = player.camera;
             Player::RLState manualStateBefore = player.GetRLState(world.obstacles);
             int manualAction = InferManualRLAction(
                 player,
@@ -2886,6 +3686,9 @@ int main() {
                 manualInput.isWallRunning = player.isWallRunning;
                 manualInput.dashCooldown = player.dashCooldown;
                 manualInput.dashVisualTimer = player.dashVisualTimer;
+                if (manualReplay.frames.empty() && playerTimeBeforeUpdate <= 0.0f) {
+                    manualReplay.SeedStartFrame(playerPositionBeforeUpdate, playerCameraBeforeUpdate, manualAction, manualInput);
+                }
                 manualReplay.Record(player, manualStateBefore, manualAction, player.rlReward, manualStateAfter, manualInput);
                 if (manualReplay.HasRun() && !manualReplay.savedToLibrary) {
                     std::string manualRunMessage;
@@ -2942,27 +3745,25 @@ int main() {
         }
 
         if (IsKeyPressed(KEY_P)) {
-            bool savedReport = WriteTrainingReport(
-                "rl_training_report.txt",
-                trainer,
-                world,
-                trainingSpeedIndex,
-                trainingActualSpeedScale,
-                trainingPendingSimSeconds,
-                trainingStepsLastFrame,
-                trainingSimSecondsLastFrame,
-                turboTraining,
-                soloTraining,
-                manualBestReplay,
-                manualRunLibrary
-            );
+            std::string reportError;
+            bool savedReport = writeCurrentTrainingReport(reportError);
             reportMessage = savedReport
-                ? "REPORT SAVED: rl_training_report.txt"
-                : "REPORT FAILED: rl_training_report.txt";
+                ? "REPORT SAVED: " + TrainingReportPath()
+                : "REPORT FAILED: " + reportError;
             reportFlashTimer = 2.5f;
         }
 
         AutoSaveTrainerModels(trainer, dt, persistenceState, modelLibrary);
+        reportAutosaveTimer += dt;
+        if (reportAutosaveTimer >= RL_REPORT_AUTOSAVE_INTERVAL) {
+            reportAutosaveTimer = 0.0f;
+            std::string reportError;
+            bool savedReport = writeCurrentTrainingReport(reportError);
+            if (!savedReport) {
+                reportMessage = "AUTO REPORT FAILED: " + reportError;
+                reportFlashTimer = 3.0f;
+            }
+        }
 
         if (reportFlashTimer > 0.0f) {
             reportFlashTimer = fmaxf(0.0f, reportFlashTimer - dt);
@@ -2974,16 +3775,39 @@ int main() {
         const Player& viewPlayer = rlAutoplay ? trainer.ActiveRunner().player : player;
         const RLRunner& activeRunner = trainer.ActiveRunner();
         bool bestRunCameraView = rlAutoplay && bestRunView && !rlTrainingView && activeRunner.HasBestRun();
-        bool manualRunCameraView = !rlAutoplay && manualRunView && manualRunLibrary.HasRuns();
+        bool spectatorRaceCameraView = !rlAutoplay && spectatorRaceView;
+        bool manualRunCameraView = !rlAutoplay && manualRunView && manualRunLibrary.HasRuns() && !spectatorRaceCameraView;
         ManualInputFrame manualReplayInput = manualRunCameraView
             ? manualRunLibrary.ActiveRun().ManualInputAt(manualRunReplayTimer)
-            : ManualInputFrame();
+            : (spectatorRaceCameraView && spectatorRaceCameraMode == 1 && manualBestReplay.HasRun()
+                ? manualBestReplay.ManualInputAt(spectatorRaceTimer)
+                : ManualInputFrame());
+        RLReplayFrame spectatorAiFrame = (spectatorRaceCameraView && activeRunner.HasBestRun())
+            ? activeRunner.BestRunFrame(spectatorRaceTimer)
+            : RLReplayFrame{};
+        bool spectatorAiDash = false;
+        if (spectatorRaceCameraView && spectatorRaceCameraMode == 2 && spectatorAiFrame.action >= 0 && spectatorAiFrame.action < (int)RLActions().size()) {
+            spectatorAiDash = RLActions()[spectatorAiFrame.action].dash;
+        }
+        bool spectatorManualDash = manualReplayInput.isDashing || manualReplayInput.dashVisualTimer > 0.0f;
+        bool spectatorDashActive = spectatorRaceCameraMode == 1 ? spectatorManualDash : (spectatorRaceCameraMode == 2 && spectatorAiDash);
+        Camera3D spectatorActiveCamera = spectatorRaceCamera;
+        if (spectatorRaceCameraView && spectatorRaceCameraMode == 1 && manualBestReplay.HasRun()) {
+            spectatorActiveCamera = ManualRaceFrameAt(manualBestReplay, spectatorRaceTimer, world.startPoint).camera;
+        } else if (spectatorRaceCameraView && spectatorRaceCameraMode == 2 && activeRunner.HasBestRun()) {
+            spectatorActiveCamera = activeRunner.BestRunCamera(spectatorRaceTimer);
+        }
+        if (spectatorRaceCameraView && spectatorRaceCameraMode != 0 && spectatorPovFreeLook) {
+            spectatorActiveCamera = SpectatorPovFreeLookCamera(spectatorActiveCamera, spectatorPovYaw, spectatorPovPitch);
+        }
         bool dashActiveForUi = manualRunCameraView
             ? (manualReplayInput.isDashing || manualReplayInput.dashVisualTimer > 0.0f)
-            : viewPlayer.isDashing;
-        bool wallRunningForUi = manualRunCameraView ? manualReplayInput.isWallRunning : viewPlayer.isWallRunning;
-        float dashCooldownForUi = manualRunCameraView ? manualReplayInput.dashCooldown : viewPlayer.dashCooldown;
-        float dashVisualTimerForUi = manualRunCameraView ? manualReplayInput.dashVisualTimer : viewPlayer.dashVisualTimer;
+            : (spectatorRaceCameraView ? spectatorDashActive : viewPlayer.isDashing);
+        bool wallRunningForUi = manualRunCameraView ? manualReplayInput.isWallRunning : (!spectatorRaceCameraView && viewPlayer.isWallRunning);
+        float dashCooldownForUi = manualRunCameraView ? manualReplayInput.dashCooldown : (spectatorRaceCameraView ? 0.0f : viewPlayer.dashCooldown);
+        float dashVisualTimerForUi = manualRunCameraView
+            ? manualReplayInput.dashVisualTimer
+            : (spectatorRaceCameraView ? (spectatorRaceCameraMode == 1 ? manualReplayInput.dashVisualTimer : 0.0f) : viewPlayer.dashVisualTimer);
 
         if (bestRunCameraView) {
             bestReplayTimer += dt;
@@ -2997,10 +3821,12 @@ int main() {
 
         Camera3D replayCamera = bestRunCameraView
             ? activeRunner.BestRunCamera(bestReplayTimer)
-            : (manualRunCameraView ? manualRunLibrary.ActiveRun().FrameAt(manualRunReplayTimer).camera : viewPlayer.camera);
+            : (spectatorRaceCameraView
+                ? spectatorActiveCamera
+                : (manualRunCameraView ? ManualRaceFrameAt(manualRunLibrary.ActiveRun(), manualRunReplayTimer, world.startPoint).camera : viewPlayer.camera));
 
-        float hSpeed = viewPlayer.GetHorizontalSpeed();
-        float targetSpread = hSpeed * 1.35f + (!viewPlayer.onGround ? 12.0f : 0.0f);
+        float hSpeed = spectatorRaceCameraView ? 0.0f : viewPlayer.GetHorizontalSpeed();
+        float targetSpread = spectatorRaceCameraView ? 0.0f : (hSpeed * 1.35f + (!viewPlayer.onGround ? 12.0f : 0.0f));
         if (dashActiveForUi) targetSpread += 6.0f;
         if (!rlAutoplay && katana.active) targetSpread += 4.0f;
         spread = Lerp(spread, targetSpread, dt * 15.0f);
@@ -3026,10 +3852,19 @@ int main() {
                 } else {
                     BeginMode3D(replayCamera);
                         world.Draw(replayCamera);
-                        if (!rlAutoplay && !manualRunCameraView) {
+                        if (spectatorRaceCameraView) {
+                            DrawSpectatorRace3D(
+                                manualBestReplay,
+                                activeRunner,
+                                spectatorRaceTimer,
+                                spectatorRaceCameraMode,
+                                world.startPoint,
+                                world.goalPoint
+                            );
+                        } else if (!rlAutoplay && !manualRunCameraView) {
                             float manualRaceTime = manualRaceStarted ? player.rlEpisodeTime : 0.0f;
                             DrawManualBestGhost(activeRunner, player.position, world.startPoint, manualRaceTime);
-                            DrawManualCompletedGhost(manualBestReplay, player.position, manualRaceTime);
+                            DrawManualCompletedGhost(manualBestReplay, player.position, world.startPoint, manualRaceTime);
                             katana.Draw3D(replayCamera, player.currentBob);
                         }
                     EndMode3D();
@@ -3073,6 +3908,24 @@ int main() {
             }
 
             if (!rlAutoplay || !rlTrainingView) {
+                if (spectatorRaceCameraView) {
+                    DrawSpectatorRaceOverlay(
+                        manualBestReplay,
+                        activeRunner,
+                        spectatorRaceTimer,
+                        spectatorRaceRunning,
+                        SPECTATOR_RACE_SPEED_OPTIONS[spectatorRaceSpeedIndex],
+                        spectatorRaceCameraMode,
+                        spectatorPovFreeLook,
+                        world.startPoint,
+                        world.goalPoint
+                    );
+                    if (spectatorRaceCameraMode == 1) {
+                        DrawManualInputOverlay(manualBestReplay, world.goalPoint, spectatorRaceTimer);
+                    } else if (spectatorRaceCameraMode == 2) {
+                        DrawAIInputOverlay(activeRunner, spectatorRaceTimer);
+                    }
+                } else {
                 DrawStatusBar(20, SCREEN_HEIGHT - 70, 300, 25, viewPlayer.health, MAX_HEALTH, RED, "HEALTH");
 
                 float dashStatus = 1.0f - Clamp(dashCooldownForUi / DASH_COOLDOWN_TIME, 0.0f, 1.0f);
@@ -3124,7 +3977,7 @@ int main() {
                     );
                     std::string runName = TruncateTextToWidth(manualRunLibrary.ActiveLabel(), 520, 16);
                     DrawText(runName.c_str(), 20, 224, 16, LIGHTGRAY);
-                    DrawText("F = live manual  [ ] = switch saved run  R = restart replay", 20, 246, 16, LIGHTGRAY);
+                    DrawText("F = live manual  [ ] = switch saved run  R = restart replay  G = race", 20, 246, 16, LIGHTGRAY);
                     DrawText(TextFormat("FRAMES: %d  TRAIL: %d  SAMPLES: %d",
                         (int)replay.frames.size(),
                         (int)replay.trail.size(),
@@ -3136,7 +3989,7 @@ int main() {
                     );
                     DrawManualInputOverlay(replay, world.goalPoint, manualRunReplayTimer);
                 } else {
-                    DrawText("Manual: WASD + Mouse + Space + Shift + E + Q", 20, 202, 16, LIGHTGRAY);
+                    DrawText("Manual: WASD + Mouse + Space + Shift + E + Q   G = spectator race", 20, 202, 16, LIGHTGRAY);
                     if (activeRunner.HasBestRun()) {
                         float manualRaceTime = manualRaceStarted ? player.rlEpisodeTime : 0.0f;
                         RLReplayFrame ghost = manualRaceStarted ? activeRunner.BestRunFrame(manualRaceTime) : (RLReplayFrame){ world.startPoint, player.camera, 0.0f, -1 };
@@ -3153,7 +4006,7 @@ int main() {
                         );
                         DrawText(manualRaceStarted ? "TAB/arrows = switch ghost  R = restart race" : "Race starts when you move", 20, 246, 16, manualRaceStarted ? LIGHTGRAY : GOLD);
                         if (manualBestReplay.HasRun()) {
-                            DrawManualPlayerGhostStats(manualBestReplay, player.position, world.goalPoint, manualRaceTime, 20, 268);
+                            DrawManualPlayerGhostStats(manualBestReplay, player.position, world.startPoint, world.goalPoint, manualRaceTime, 20, 268);
                         }
                         if (manualRunLibrary.HasRuns()) {
                             std::string manualRunText = TruncateTextToWidth("F replay POV  [ ] saved: " + manualRunLibrary.ActiveLabel(), 590, 16);
@@ -3164,7 +4017,7 @@ int main() {
                         DrawText("Train a successful run first, then switch back to manual", 20, 246, 16, LIGHTGRAY);
                         if (manualBestReplay.HasRun()) {
                             float manualRaceTime = manualRaceStarted ? player.rlEpisodeTime : 0.0f;
-                            DrawManualPlayerGhostStats(manualBestReplay, player.position, world.goalPoint, manualRaceTime, 20, 268);
+                            DrawManualPlayerGhostStats(manualBestReplay, player.position, world.startPoint, world.goalPoint, manualRaceTime, 20, 268);
                         }
                         if (manualRunLibrary.HasRuns()) {
                             std::string manualRunText = TruncateTextToWidth("F replay POV  [ ] saved: " + manualRunLibrary.ActiveLabel(), 590, 16);
@@ -3180,6 +4033,7 @@ int main() {
 
                 if (rlAutoplay && viewPlayer.rlDone) {
                     DrawText("EPISODE COMPLETE - RESETTING", cx - 140, cy - 110, 20, GOLD);
+                }
                 }
             }
 
@@ -3209,20 +4063,8 @@ int main() {
     std::string finalAutosaveError;
     SaveTrainerAutosaves(trainer, finalAutosaveError);
 
-    WriteTrainingReport(
-        "rl_training_report.txt",
-        trainer,
-        world,
-        trainingSpeedIndex,
-        trainingActualSpeedScale,
-        trainingPendingSimSeconds,
-        trainingStepsLastFrame,
-        trainingSimSecondsLastFrame,
-        turboTraining,
-        soloTraining,
-        manualBestReplay,
-        manualRunLibrary
-    );
+    std::string finalReportError;
+    writeCurrentTrainingReport(finalReportError);
 
     UnloadShader(ppShader);
     UnloadRenderTexture(renderTarget);

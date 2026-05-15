@@ -710,10 +710,13 @@ struct RLRunner {
     std::vector<RLReplayFrame> bestFrames;
     std::vector<RLExperience> episodeExperiences;
     std::vector<RLExperience> bestExperiences;
+    std::vector<RLExperience> manualGuidanceBest;
     std::vector<int> episodeActionCounts;
     std::vector<int> lifetimeActionCounts;
     std::vector<RLEpisodeSummary> recentEpisodes;
     RLPolicySnapshot bestPolicy;
+    float manualGuidanceBestTime = 9999.0f;
+    int manualGuidanceRehearsals = 0;
 
     RLRunner() = default;
 
@@ -793,17 +796,37 @@ struct RLRunner {
         bestRunRehearsals += count;
     }
 
-    int BestRunActionNearState(const Player::RLState& state, float& confidence) {
+    void RehearseManualGuidance(int samples, float tdScale, float imitationScale) {
+        if (manualGuidanceBest.empty() || samples <= 0) return;
+
+        int count = std::min(samples, (int)manualGuidanceBest.size());
+        for (int i = 0; i < count; ++i) {
+            int index = ((manualGuidanceRehearsals + i) * 5) % (int)manualGuidanceBest.size();
+            const RLExperience& source = manualGuidanceBest[index];
+            if (source.action < 0 || source.action >= (int)RLActions().size()) continue;
+
+            float phase = (index + 1.0f) / fmaxf(1.0f, (float)manualGuidanceBest.size());
+            float timeEdge = Clamp((bestTime - manualGuidanceBestTime) / 0.50f, 0.0f, 1.0f);
+            float guidedReward = source.reward + 3.0f + 8.0f * phase + 3.0f * timeEdge + (source.done ? 60.0f : 0.0f);
+            model.Learn(source.state, source.action, guidedReward, source.nextState, source.done, tdScale);
+            model.ImitateAction(source.state, source.action, 0.46f + 0.12f * phase + 0.05f * timeEdge, imitationScale);
+            model.ProtectActionFromLowUsagePenalty(source.action);
+        }
+
+        manualGuidanceRehearsals += count;
+    }
+
+    int ActionFromExperienceRunNearState(const std::vector<RLExperience>& run, const Player::RLState& state, float& confidence) {
         confidence = 0.0f;
-        if (bestExperiences.empty()) return -1;
+        if (run.empty()) return -1;
 
         model.EnsureFeatureCount((int)state.size());
         RLLinearQModel::FeatureArray features = model.EncodeState(state);
 
         int bestIndex = -1;
         float bestMatch = 9999.0f;
-        for (int i = 0; i < (int)bestExperiences.size(); ++i) {
-            const RLExperience& experience = bestExperiences[i];
+        for (int i = 0; i < (int)run.size(); ++i) {
+            const RLExperience& experience = run[i];
             if (experience.action < 0 || experience.action >= (int)RLActions().size()) continue;
             if (!model.ActionAllowedByMask(features, experience.action)) continue;
 
@@ -824,10 +847,29 @@ struct RLRunner {
         if (bestIndex < 0 || bestMatch > 0.13f) return -1;
 
         confidence = Clamp((0.13f - bestMatch) / 0.13f, 0.0f, 1.0f);
-        return bestExperiences[bestIndex].action;
+        return run[bestIndex].action;
+    }
+
+    int BestRunActionNearState(const Player::RLState& state, float& confidence) {
+        return ActionFromExperienceRunNearState(bestExperiences, state, confidence);
     }
 
     int ChooseAnchoredAction(const Player::RLState& state) {
+        if (!manualGuidanceBest.empty() && manualGuidanceBestTime < bestTime - 0.004f) {
+            float manualConfidence = 0.0f;
+            int manualAction = ActionFromExperienceRunNearState(manualGuidanceBest, state, manualConfidence);
+            if (manualAction >= 0 && manualConfidence >= 0.68f) {
+                float completion = Clamp(state[3], 0.0f, 1.0f);
+                float manualChance = completion > 0.82f ? 0.16f : 0.09f;
+                if (episodesSinceBest > 80) manualChance += 0.03f;
+                if (episodesSinceBest > 240) manualChance += 0.03f;
+                manualChance = Clamp(manualChance * manualConfidence, 0.0f, 0.22f);
+
+                std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+                if (unit(model.rng) < manualChance) return manualAction;
+            }
+        }
+
         float confidence = 0.0f;
         int bestAction = BestRunActionNearState(state, confidence);
         if (bestAction >= 0) {
@@ -903,6 +945,13 @@ struct RLRunner {
             model.minEpsilon = fminf(model.minEpsilon, 0.006f);
             model.epsilon = fmaxf(0.004f, fminf(model.epsilon, 0.018f));
             if ((episode % 12) == 0) RehearseBestRun(4, 0.24f, 0.06f);
+        }
+        if (!manualGuidanceBest.empty()) {
+            bool manualIsFaster = manualGuidanceBestTime < bestTime - 0.004f;
+            int interval = manualIsFaster ? 18 : 40;
+            if ((episode % interval) == 0) {
+                RehearseManualGuidance(manualIsFaster ? 2 : 1, manualIsFaster ? 0.18f : 0.12f, manualIsFaster ? 0.035f : 0.02f);
+            }
         }
         currentAction = ChooseAnchoredAction(currentState);
         EnsureActionTelemetry();
@@ -1036,17 +1085,32 @@ struct RLRunner {
                     improvedBest = true;
                 }
 
+                bool cleanFastSuccess =
+                    lastEpisodeTime <= 6.35f &&
+                    player.rlWallHits <= 10 &&
+                    player.rlCollisionPenaltyTotal <= 20.0f;
+                float speedPolish = Clamp((6.65f - lastEpisodeTime) / 1.15f, 0.0f, 1.0f);
                 for (int i = 0; i < (int)episodeExperiences.size(); ++i) {
                     RLExperience elite = episodeExperiences[i];
                     float phase = (i + 1.0f) / fmaxf(1.0f, (float)episodeExperiences.size());
-                    elite.reward += 4.0f + 14.0f * phase;
-                    elite.priority += 18.0f + 28.0f * phase;
+                    elite.reward += 4.0f + 14.0f * phase + speedPolish * (3.0f + 10.0f * phase);
+                    elite.priority += 18.0f + 28.0f * phase + speedPolish * (10.0f + 18.0f * phase);
                     model.RememberExperience(elite);
                     model.RememberEliteExperience(elite);
                 }
 
                 model.ReplayMemory(improvedBest ? 14 : 8);
                 model.ReplayEliteMemory(improvedBest ? 22 : 12);
+                if (cleanFastSuccess) {
+                    int polishCount = std::min((int)episodeExperiences.size(), 80);
+                    for (int i = 0; i < polishCount; ++i) {
+                        const RLExperience& experience = episodeExperiences[i];
+                        float phase = (i + 1.0f) / fmaxf(1.0f, (float)polishCount);
+                        model.ImitateAction(experience.state, experience.action, 0.64f + 0.22f * phase, 0.12f);
+                        model.ProtectActionFromLowUsagePenalty(experience.action);
+                    }
+                    model.ReplayEliteMemory(18);
+                }
                 if (improvedBest) {
                     RehearseBestRun(std::min(80, std::max(20, (int)bestExperiences.size())), 0.55f, 0.16f);
                     bestPolicy = model.MakePolicySnapshot();
@@ -1070,6 +1134,9 @@ struct RLRunner {
                 if (!bestExperiences.empty() && (episodesSinceBest % 4) == 0) {
                     RehearseBestRun(player.rlSucceeded ? 4 : 7, 0.28f, 0.06f);
                 }
+                if (!manualGuidanceBest.empty() && manualGuidanceBestTime < bestTime - 0.004f && (episodesSinceBest % 20) == 0) {
+                    RehearseManualGuidance(player.rlSucceeded ? 2 : 3, 0.16f, 0.035f);
+                }
                 if (bestPolicy.valid && episodesSinceBest > 0 && episodesSinceBest % 120 == 0) {
                     model.BlendTowardPolicySnapshot(bestPolicy, 0.18f);
                     model.epsilon = fmaxf(0.004f, fminf(model.epsilon, 0.018f));
@@ -1080,6 +1147,7 @@ struct RLRunner {
                     model.epsilon = fmaxf(0.004f, fminf(model.epsilon, 0.026f));
                     if (bestPolicy.valid) model.BlendTowardPolicySnapshot(bestPolicy, 0.28f);
                     RehearseBestRun(24, 0.40f, 0.10f);
+                    if (!manualGuidanceBest.empty()) RehearseManualGuidance(6, 0.18f, 0.04f);
                     model.ReplayEliteMemory(18);
                     episodesSinceBest = 200;
                 }
@@ -1191,7 +1259,14 @@ struct RLRunner {
     void LearnFromEliteReplay(const std::vector<RLExperience>& replay, float finishTime, bool manualGuidance) {
         if (replay.empty()) return;
 
+        if (manualGuidance && finishTime > 0.0f && finishTime < manualGuidanceBestTime) {
+            manualGuidanceBestTime = finishTime;
+            manualGuidanceBest = replay;
+            manualGuidanceRehearsals = 0;
+        }
+
         int learned = 0;
+        float manualTimeEdge = manualGuidance ? Clamp((bestTime - finishTime) / 0.60f, 0.0f, 1.0f) : 0.0f;
         for (int i = 0; i < (int)replay.size(); ++i) {
             const RLExperience& source = replay[i];
             if (source.action < 0 || source.action >= (int)RLActions().size()) continue;
@@ -1201,28 +1276,39 @@ struct RLRunner {
 
             RLExperience elite = source;
             float phase = (i + 1.0f) / fmaxf(1.0f, (float)replay.size());
-            elite.reward += 6.0f + 24.0f * phase;
-            elite.priority += 30.0f + 58.0f * phase;
+            if (manualGuidance) {
+                elite.reward += 5.0f + 14.0f * phase + 5.0f * manualTimeEdge;
+                elite.priority += 24.0f + 45.0f * phase + 14.0f * manualTimeEdge;
+            } else {
+                elite.reward += 6.0f + 24.0f * phase;
+                elite.priority += 30.0f + 58.0f * phase;
+            }
 
             if (elite.done) {
-                float timeBonus = fmaxf(0.0f, RL_MAX_EPISODE_TIME - finishTime) * 7.0f;
-                elite.reward += 120.0f + timeBonus;
-                elite.priority += 90.0f;
+                float timeBonus = fmaxf(0.0f, RL_MAX_EPISODE_TIME - finishTime) * (manualGuidance ? 8.0f : 7.0f);
+                elite.reward += (manualGuidance ? 110.0f : 120.0f) + timeBonus;
+                elite.priority += manualGuidance ? 80.0f : 90.0f;
             }
 
             model.RememberExperience(elite);
             model.RememberEliteExperience(elite);
-            if ((i % 2) == 0 || elite.done) {
-                model.Learn(elite.state, elite.action, elite.reward, elite.nextState, elite.done, manualGuidance ? 0.48f : 0.58f);
+            if ((manualGuidance && ((i % 3) == 0 || elite.done)) || (!manualGuidance && ((i % 2) == 0 || elite.done))) {
+                model.Learn(elite.state, elite.action, elite.reward, elite.nextState, elite.done, manualGuidance ? 0.42f : 0.58f);
+            }
+            if (manualGuidance) {
+                model.ImitateAction(elite.state, elite.action, 0.50f + 0.12f * phase + 0.05f * manualTimeEdge, 0.08f);
             }
             learned += 1;
         }
 
         if (learned <= 0) return;
 
-        model.ReplayEliteMemory(std::min(90, std::max(18, learned / 2)));
-        model.ReplayMemory(std::min(42, std::max(8, learned / 4)));
-        model.epsilon = fmaxf(model.minEpsilon, fminf(model.epsilon, manualGuidance ? 0.16f : 0.10f));
+        model.ReplayEliteMemory(std::min(manualGuidance ? 70 : 90, std::max(18, learned / (manualGuidance ? 3 : 2))));
+        model.ReplayMemory(std::min(manualGuidance ? 32 : 42, std::max(8, learned / (manualGuidance ? 6 : 4))));
+        if (manualGuidance) {
+            RehearseManualGuidance(std::min(32, std::max(8, learned / 12)), 0.18f, 0.04f);
+        }
+        model.epsilon = fmaxf(model.minEpsilon, fminf(model.epsilon, manualGuidance ? 0.08f : 0.10f));
 
         if (manualGuidance) {
             manualGuidanceReplays += 1;

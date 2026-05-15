@@ -9,29 +9,39 @@ if ($env:PATH -notlike "*$MSYS_PATH*") {
 
 function build-game {
     Write-Host "--- Compiling main.cpp with Raylib ---" -ForegroundColor Cyan
-    
-    # The exact folder where we found raylib.h
-    $RAYLIB_SRC = "C:/raylib/raylib/src"
 
-    & "C:/msys64/ucrt64/bin/g++.exe" main.cpp -o mygame.exe `
-        -O2 -DNDEBUG -std=gnu++17 `
-        "-I$RAYLIB_SRC" `
-        "-L$RAYLIB_SRC" `
-        -lraylib -lopengl32 -lgdi32 -lwinmm 2>&1
-    
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "BUILD SUCCESSFUL!" -ForegroundColor Green
-        & .\mygame.exe
-    } else {
-        Write-Host "BUILD FAILED." -ForegroundColor Red
+    Push-Location $PSScriptRoot
+    try {
+        # The exact folder where we found raylib.h
+        $RAYLIB_SRC = "C:/raylib/raylib/src"
+
+        & "C:/msys64/ucrt64/bin/g++.exe" main.cpp -o mygame.exe `
+            -O2 -DNDEBUG -std=gnu++17 `
+            "-I$RAYLIB_SRC" `
+            "-L$RAYLIB_SRC" `
+            -lraylib -lopengl32 -lgdi32 -lwinmm 2>&1
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "BUILD SUCCESSFUL!" -ForegroundColor Green
+            & .\mygame.exe
+        } else {
+            Write-Host "BUILD FAILED." -ForegroundColor Red
+        }
+    } finally {
+        Pop-Location
     }
 }
 
 function run-game {
-    if (Test-Path .\mygame.exe) {
-        & .\mygame.exe
-    } else {
-        Write-Host "Error: mygame.exe not found. Run build-game first." -ForegroundColor Yellow
+    Push-Location $PSScriptRoot
+    try {
+        if (Test-Path .\mygame.exe) {
+            & .\mygame.exe
+        } else {
+            Write-Host "Error: mygame.exe not found. Run build-game first." -ForegroundColor Yellow
+        }
+    } finally {
+        Pop-Location
     }
 }
 

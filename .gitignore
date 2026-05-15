@@ -47,3 +47,7 @@ rl_models/*.rlmodel.tmp
 # Runtime-recorded manual run replays
 manual_runs/*.manualrun
 manual_runs/*.manualrun.tmp
+
+# Local migration backups
+*.pre_migration
+rl_training_report_pre_migration_*.txt
